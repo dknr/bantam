@@ -25,10 +25,18 @@ func (t *FileTool) Name() string {
 
 // StatusLine returns a formatted status line for the file operation.
 func (t *FileTool) StatusLine(args map[string]any) string {
-	if path, ok := args["path"].(string); ok {
-		return fmt.Sprintf("file> %s", path)
+	action, _ := args["action"].(string)
+	path, _ := args["path"].(string)
+	switch action {
+	case "read":
+		return fmt.Sprintf("file> read %s", path)
+	case "write":
+		return fmt.Sprintf("file> write %s", path)
+	case "list":
+		return fmt.Sprintf("file> list %s", path)
+	default:
+		return fmt.Sprintf("file> %s (unknown)", path)
 	}
-	return "file> (unknown path)"
 }
 
 // Execute performs file operations based on the action.
