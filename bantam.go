@@ -209,11 +209,16 @@ provider:
 		}
 	}
 
-	// Setup logging with logs directory
-	logsDir := workspace + "/logs"
-	logger := logging.NewLogger(logsDir, *verbose)
-	ctx := logging.NewContextWithLogger(context.Background(), logger)
-	ctx = logging.SetVerbose(ctx, *verbose)
+// Setup logging with logs directory
+ 	logsDir := workspace + "/logs"
+ 	logger := logging.NewLogger(logsDir, *verbose)
+ 	ctx := logging.NewContextWithLogger(context.Background(), logger)
+ 	ctx = logging.SetVerbose(ctx, *verbose)
+
+ 	// Change to workspace directory so agent doesn't get lost
+ 	if err := os.Chdir(workspace); err != nil {
+ 		logger.Error(err, "failed to change to workspace directory", "workspace", workspace)
+ 	}
 
 	// Setup OpenTelemetry
 	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -261,14 +266,21 @@ provider:
 	tr.Register(tools.NewTimeTool())
 	tr.Register(tools.NewEchoTool())
 
-	// Determine system prompt (env var > config > default)
-	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
-	if systemPrompt == "" && config.SystemPrompt != "" {
-		systemPrompt = config.SystemPrompt
-	}
-	if systemPrompt == "" {
-		systemPrompt = "Read soul.md from your workspace for your identity and instructions."
-	}
+// Determine system prompt (env var > config > default)
+ 	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
+ 	if systemPrompt == "" && config.SystemPrompt != "" {
+ 		systemPrompt = config.SystemPrompt
+ 	}
+ 	if systemPrompt == "" {
+ 		// Read soul.md from workspace for agent identity
+ 		soulPath := workspace + "/soul.md"
+ 		soulContent, err := os.ReadFile(soulPath)
+ 		if err != nil {
+ 			// Use default if soul.md not found
+ 			soulContent = []byte("You are Bantam, a lightweight AI agent with access to system tools.")
+ 		}
+ 		systemPrompt = string(soulContent)
+ 	}
 
 	// Create agent
 	ag := agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt)
@@ -392,9 +404,15 @@ func printResponse(ctx context.Context, response string, tokens map[string]int, 
 }
 
 // printTokenStats prints token usage statistics
-func printTokenStats(tokens map[string]int, durationMs float64) {
-	inputTokens := tokens["input_tokens"]
-	outputTokens := tokens["output_tokens"]
-	totalTokens := inputTokens + outputTokens
-	fmt.Printf("%d tokens (%d in, %d out) | %.1fs", totalTokens, inputTokens, outputTokens, durationMs/1000)
-}
+ func printTokenStats(tokens map[string]int, durationMs float64) {
+ 	inputTokens := 0
+ 	outputTokens := 0
+ 	if v, ok := tokens["prompt"]; ok {
+ 		inputTokens = v
+ 	}
+ 	if v, ok := tokens["completion"]; ok {
+ 		outputTokens = v
+ 	}
+ 	totalTokens := inputTokens + outputTokens
+ 	fmt.Printf("%d tokens (%d in, %d out) | %.1fs", totalTokens, inputTokens, outputTokens, durationMs/1000)
+ }

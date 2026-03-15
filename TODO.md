@@ -12,6 +12,23 @@
 - CLI `/clear` command fixed - Pass session manager to CLI channel, added `ClearSession()` method to Manager
 - System prompt implementation - Add embedded default, config file support, and environment variable override
 - **Structural cleanup** - Moved `main/main.go` → `bantam.go` (root), `main/defaults/` → `defaults/` (root)
+- **Bug fix** - Removed double span.End() call that was causing segfault
+
+## Bugs to Fix
+
+### 1. Token Stats Showing 0
+**Issue:** Status line shows "0 tokens (0 in, 0 out)" instead of actual token counts from response
+**Plan:**
+- Check how token counts are extracted from the response
+- Verify the response contains token information
+- Fix token extraction to use correct keys
+
+### 2. Working Directory Not Set to Workspace
+**Issue:** Agent doesn't know its workspace directory, gets "lost"
+**Plan:**
+- Set working directory to configured workspace on startup
+- Pass workspace to tools (filesystem already does this)
+- Ensure all operations use absolute paths within workspace
 
 ## High Priority
 
