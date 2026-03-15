@@ -20,13 +20,13 @@ go build -o bantam .
 
 ```bash
 # Set your API key
-export OPENAI_API_KEY="sk-..."
+export BANTAM_API_KEY="sk-..."
 
 # Set your API base (optional, defaults to Ollama)
-export OPENAI_API_BASE="http://localhost:11434/v1"
+export BANTAM_API_BASE="http://localhost:11434/v1"
 
 # Set model (optional)
-export OPENAI_MODEL="gpt-oss-20b"
+export BANTAM_MODEL="gpt-oss-20b"
 ```
 
 ## Usage

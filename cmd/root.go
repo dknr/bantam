@@ -74,14 +74,14 @@ Usage:
 						workspace = config.Workspace
 					}
 					// Apply provider settings from config
-					if os.Getenv("OPENAI_API_KEY") == "" && config.Provider.APIKey != "" {
-						os.Setenv("OPENAI_API_KEY", config.Provider.APIKey)
+					if os.Getenv("BANTAM_API_KEY") == "" && config.Provider.APIKey != "" {
+						os.Setenv("BANTAM_API_KEY", config.Provider.APIKey)
 					}
-					if os.Getenv("OPENAI_API_BASE") == "" && config.Provider.APIBase != "" {
-						os.Setenv("OPENAI_API_BASE", config.Provider.APIBase)
+					if os.Getenv("BANTAM_API_BASE") == "" && config.Provider.APIBase != "" {
+						os.Setenv("BANTAM_API_BASE", config.Provider.APIBase)
 					}
-					if os.Getenv("OPENAI_MODEL") == "" && config.Provider.Model != "" {
-						os.Setenv("OPENAI_MODEL", config.Provider.Model)
+					if os.Getenv("BANTAM_MODEL") == "" && config.Provider.Model != "" {
+						os.Setenv("BANTAM_MODEL", config.Provider.Model)
 					}
 					// Apply tracing settings from config
 					if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && config.Tracing.Endpoint != "" {
@@ -116,16 +116,16 @@ func init() {
 // getAgent creates and returns a configured agent
 func getAgent(logger logr.Logger) (*agent.Agent, error) {
 	// Create provider
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	apiBase := os.Getenv("OPENAI_API_BASE")
-	model := os.Getenv("OPENAI_MODEL")
+	apiKey := os.Getenv("BANTAM_API_KEY")
+	apiBase := os.Getenv("BANTAM_API_BASE")
+	model := os.Getenv("BANTAM_MODEL")
 	if model == "" {
 		model = "gpt-oss-20b"
 	}
 
 	// Check if provider is configured
 	if apiBase == "" {
-		logger.Info("OPENAI_API_BASE not set, assuming local Ollama at http://localhost:11434/v1")
+		logger.Info("BANTAM_API_BASE not set, assuming local Ollama at http://localhost:11434/v1")
 		apiBase = "http://localhost:11434/v1"
 	}
 
