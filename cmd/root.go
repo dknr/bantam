@@ -3,13 +3,14 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
+	"github.com/dknr/bantam/cmd/session"
+	"github.com/dknr/bantam/paths"
 	"github.com/dknr/bantam/provider"
-	"github.com/dknr/bantam/session"
+	bantsession "github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
@@ -39,56 +40,6 @@ type Config struct {
 	} `yaml:"provider"`
 }
 
-// Session management functions
-var sessionCmd = &cobra.Command{
-	Use:   "session",
-	Short: "Session management commands",
-	Long:  `Manage chat sessions - list, clear, or delete them.`,
-}
-
-var sessionClearCmd = &cobra.Command{
-	Use:   "clear [session-key]",
-	Short: "Clear a session",
-	Long:  `Clear a session by removing its database file. Clears default session (cli:direct) if no key provided.`,
-	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		sessKey := "cli:direct"
-		if len(args) > 0 {
-			sessKey = args[0]
-		}
-
-		sessions := session.NewManager(baseDir, workspace)
-
-		if err := sessions.ClearSession(sessKey); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return err
-		}
-
-		fmt.Printf("\033[90mSession %s cleared. Type your message.\033[0m\n", sessKey)
-		return nil
-	},
-}
-
-var sessionListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all sessions",
-	Long:  `List all existing sessions.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		sessions := session.NewManager(baseDir, workspace)
-		sessionsList := sessions.ListSessions()
-
-		if len(sessionsList) == 0 {
-			fmt.Println("No sessions found.")
-		} else {
-			fmt.Println("Sessions:")
-			for _, s := range sessionsList {
-				fmt.Printf("  - %s\n", s)
-			}
-		}
-		return nil
-	},
-}
-
 var rootCmd = &cobra.Command{
 	Use:   "bantam",
 	Short: "Bantam - A lightweight agent with unified message routing",
@@ -101,20 +52,18 @@ Usage:
   bantam session       - Session management commands
   bantam init          - Initialize workspace and config`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Determine base directory
-		if baseDir == "" {
-			baseDir = filepath.Join(os.Getenv("HOME"), ".bantam")
+		// Initialize paths (uses baseDir/workspace flags or defaults)
+		if err := paths.Init(baseDir, workspace); err != nil {
+			return err
 		}
 
-		// Determine workspace directory
-		if workspace == "" {
-			workspace = filepath.Join(baseDir, "workspace")
-		}
+		// Update baseDir/workspace from paths package
+		baseDir = paths.BaseDir
+		workspace = paths.WorkspaceDir
 
 		// Load config if it exists
-		configPath := filepath.Join(baseDir, "config.yaml")
-		if _, err := os.Stat(configPath); err == nil {
-			configData, err := os.ReadFile(configPath)
+		if _, err := os.Stat(paths.ConfigPath); err == nil {
+			configData, err := os.ReadFile(paths.ConfigPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to read config file: %v\n", err)
 			} else {
@@ -161,10 +110,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&baseDir, "basedir", "", "Base directory for config/logs/sessions")
 	rootCmd.PersistentFlags().StringVar(&workspace, "workspace", "", "Workspace directory")
 
-	// Register session commands
-	sessionCmd.AddCommand(sessionClearCmd)
-	sessionCmd.AddCommand(sessionListCmd)
-	rootCmd.AddCommand(sessionCmd)
+	// Register session subcommand
+	session.Register(rootCmd)
 }
 
 // getAgent creates and returns a configured agent
@@ -186,12 +133,12 @@ func getAgent(logger logr.Logger) (*agent.Agent, error) {
 	p := provider.NewOpenAIProvider(apiKey, apiBase, model)
 
 	// Create session manager
-	sessions := session.NewManager(baseDir, workspace)
+	sessions := bantsession.NewManager(paths.SessionsDir)
 
 	// Create tool registry
 	tr := tools.NewRegistry()
 	tr.Register(tools.NewShellTool())
-	tr.Register(tools.NewFileSystemTool(workspace))
+	tr.Register(tools.NewFileSystemTool(paths.WorkspaceDir))
 	tr.Register(tools.NewTimeTool())
 	tr.Register(tools.NewEchoTool())
 
@@ -228,12 +175,12 @@ func getProvider(logger logr.Logger) (provider.Provider, error) {
 }
 
 // getSessionManager creates and returns a session manager
-func getSessionManager() *session.Manager {
-	return session.NewManager(baseDir, workspace)
+func getSessionManager() *bantsession.Manager {
+	return bantsession.NewManager(paths.SessionsDir)
 }
 
 // getCLIChannel creates and returns a CLI channel
-func getCLIChannel(sessions *session.Manager) *channel.CLIChannel {
+func getCLIChannel(sessions *bantsession.Manager) *channel.CLIChannel {
 	return channel.NewCLIChannel(sessions, sessionKey)
 }
 

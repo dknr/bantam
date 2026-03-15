@@ -27,9 +27,7 @@ type Session struct {
 	updatedAt time.Time
 }
 
-func (s *Session) initDB(workspace string) error {
-	dbPath := filepath.Join(workspace, "sessions", sanitizeKey(s.Key)+".db")
-
+func (s *Session) initDB(dbPath string) error {
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		return err
@@ -42,12 +40,12 @@ func (s *Session) initDB(workspace string) error {
 
 	// Create sessions table
 	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS sessions (
-			key TEXT PRIMARY KEY,
-			created_at TEXT NOT NULL,
-			updated_at TEXT NOT NULL
-		)
-	`)
+ 		CREATE TABLE IF NOT EXISTS sessions (
+ 			key TEXT PRIMARY KEY,
+ 			created_at TEXT NOT NULL,
+ 			updated_at TEXT NOT NULL
+ 		)
+ 	`)
 	if err != nil {
 		db.Close()
 		return fmt.Errorf("failed to create sessions table: %w", err)
@@ -55,15 +53,15 @@ func (s *Session) initDB(workspace string) error {
 
 	// Create messages table
 	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS messages (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			session_key TEXT NOT NULL,
-			role TEXT NOT NULL,
-			content TEXT NOT NULL,
-			timestamp TEXT NOT NULL,
-			FOREIGN KEY (session_key) REFERENCES sessions(key)
-		)
-	`)
+ 		CREATE TABLE IF NOT EXISTS messages (
+ 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+ 			session_key TEXT NOT NULL,
+ 			role TEXT NOT NULL,
+ 			content TEXT NOT NULL,
+ 			timestamp TEXT NOT NULL,
+ 			FOREIGN KEY (session_key) REFERENCES sessions(key)
+ 		)
+ 	`)
 	if err != nil {
 		db.Close()
 		return fmt.Errorf("failed to create messages table: %w", err)
@@ -71,9 +69,9 @@ func (s *Session) initDB(workspace string) error {
 
 	// Insert session record
 	_, err = db.Exec(`
-		INSERT OR REPLACE INTO sessions (key, created_at, updated_at)
-		VALUES (?, ?, ?)
-	`, s.Key, s.createdAt.Format(time.RFC3339), s.updatedAt.Format(time.RFC3339))
+ 		INSERT OR REPLACE INTO sessions (key, created_at, updated_at)
+ 		VALUES (?, ?, ?)
+ 	`, s.Key, s.createdAt.Format(time.RFC3339), s.updatedAt.Format(time.RFC3339))
 	if err != nil {
 		db.Close()
 		return fmt.Errorf("failed to insert session: %w", err)

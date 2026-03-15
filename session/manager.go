@@ -23,18 +23,17 @@ func sanitizeKey(key string) string {
 
 // Manager manages conversation sessions using SQLite.
 type Manager struct {
-	baseDir   string
-	workspace string
-	sessions  map[string]*Session
-	mu        sync.RWMutex
+	SessionsDir string
+	sessions    map[string]*Session
+	mu          sync.RWMutex
 }
 
 // NewManager creates a new session manager.
-func NewManager(baseDir, workspace string) *Manager {
+// sessionsDir is the full path to the sessions directory.
+func NewManager(sessionsDir string) *Manager {
 	return &Manager{
-		baseDir:   baseDir,
-		workspace: workspace,
-		sessions:  make(map[string]*Session),
+		SessionsDir: sessionsDir,
+		sessions:    make(map[string]*Session),
 	}
 }
 
@@ -67,7 +66,8 @@ func (m *Manager) GetOrCreate(key string) *Session {
 		createdAt: time.Now(),
 		updatedAt: time.Now(),
 	}
-	if err := sess.initDB(m.workspace); err != nil {
+	dbPath := filepath.Join(m.SessionsDir, sanitizeKey(key)+".db")
+	if err := sess.initDB(dbPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize session DB: %v\n", err)
 		return nil
 	}
@@ -134,7 +134,7 @@ func (m *Manager) load(key string) (*Session, error) {
 
 func (m *Manager) sessionPath(key string) string {
 	safeKey := sanitizeKey(key)
-	return filepath.Join(m.baseDir, "sessions", safeKey+".db")
+	return filepath.Join(m.SessionsDir, safeKey+".db")
 }
 
 // SessionPath returns the file path for a session key (exported version).
@@ -144,14 +144,12 @@ func (m *Manager) SessionPath(key string) string {
 
 // ListSessions returns a list of all session keys (filenames without .db).
 func (m *Manager) ListSessions() []string {
-	sessionDir := filepath.Join(m.baseDir, "sessions")
-
 	// Check if session directory exists
-	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
+	if _, err := os.Stat(m.SessionsDir); os.IsNotExist(err) {
 		return nil
 	}
 
-	entries, err := os.ReadDir(sessionDir)
+	entries, err := os.ReadDir(m.SessionsDir)
 	if err != nil {
 		return nil
 	}
@@ -175,20 +173,18 @@ func (m *Manager) Clear() error {
 	// Clear in-memory sessions
 	m.sessions = make(map[string]*Session)
 
-	sessionDir := filepath.Join(m.baseDir, "sessions")
-
 	// Check if session directory exists
-	if _, err := os.Stat(sessionDir); err != nil {
+	if _, err := os.Stat(m.SessionsDir); err != nil {
 		return nil // Nothing to clear
 	}
 
 	// Remove entire sessions directory
-	if err := os.RemoveAll(sessionDir); err != nil {
+	if err := os.RemoveAll(m.SessionsDir); err != nil {
 		return err
 	}
 
 	// Recreate directory for future sessions
-	return os.MkdirAll(sessionDir, 0755)
+	return os.MkdirAll(m.SessionsDir, 0755)
 }
 
 // ClearSession removes a specific session from memory and disk.

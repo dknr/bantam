@@ -3,6 +3,7 @@ package session
 import (
 	"fmt"
 
+	"github.com/dknr/bantam/paths"
 	"github.com/dknr/bantam/session"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +19,7 @@ var clearCmd = &cobra.Command{
 			sessKey = args[0]
 		}
 
-		sessions := session.NewManager(baseDir, workspace)
+		sessions := session.NewManager(paths.SessionsDir)
 
 		if err := sessions.ClearSession(sessKey); err != nil {
 			fmt.Printf("Error: %v\n", err)

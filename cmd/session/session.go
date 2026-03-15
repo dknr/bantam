@@ -13,5 +13,9 @@ var sessionCmd = &cobra.Command{
 func init() {
 	sessionCmd.AddCommand(clearCmd)
 	sessionCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(sessionCmd)
+}
+
+// Register adds the session command to the parent command.
+func Register(parent *cobra.Command) {
+	parent.AddCommand(sessionCmd)
 }
