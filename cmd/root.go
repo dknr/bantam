@@ -42,15 +42,14 @@ type Config struct {
 
 var rootCmd = &cobra.Command{
 	Use:   "bantam",
-	Short: "Bantam - A lightweight agent with unified message routing",
-	Long: `Bantam is a lightweight agent with unified message routing to avoid
- OpenTelemetry tracing issues experienced with separate gateway/CLI code paths.
- 
- Usage:
-   bantam run           - Start interactive mode
-   bantam prompt        - Send a single message and exit
-   bantam session       - Session management commands
-   bantam init          - Initialize workspace and config`,
+	Short: "Bantam - A lightweight agent with OpenAI-compatible API support",
+	Long: `Bantam is a lightweight agent with OpenAI-compatible provider support.
+
+Usage:
+  bantam run           - Start interactive mode
+  bantam prompt        - Send a single message and exit
+  bantam session       - Session management commands
+  bantam init          - Initialize workspace and config`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize paths (uses baseDir/workspace flags or defaults)
 		if err := paths.Init(baseDir, workspace); err != nil {

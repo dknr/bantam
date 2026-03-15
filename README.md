@@ -1,13 +1,11 @@
 # Bantam - Lightweight Agent
 
-Bantam is a lightweight AI agent with unified message routing.
+Bantam is a lightweight AI agent with OpenAI-compatible API support.
 
 ## Key Features
 
-- **Unified routing**: All messages flow through one code path
-- **OpenTelemetry**: Full distributed tracing out of the box
-- **OpenAI-compatible**: Works with any OpenAI-compatible API
-- **CLI client**: Terminal-based interaction
+- **OpenAI-compatible**: Works with any OpenAI-compatible API (Ollama, LM Studio, OpenRouter, etc.)
+- **CLI client**: Terminal-based interaction with markdown rendering
 - **Simple tools**: Shell commands, file read/write
 
 ## Installation
@@ -24,56 +22,39 @@ go build -o bantam .
 # Set your API key
 export OPENAI_API_KEY="sk-..."
 
-# Set your API base (optional, defaults to OpenAI)
-export OPENAI_API_BASE="https://api.openai.com/v1"
+# Set your API base (optional, defaults to Ollama)
+export OPENAI_API_BASE="http://localhost:11434/v1"
 
 # Set model (optional)
-export OPENAI_MODEL="gpt-4o-mini"
-
-# Set OpenTelemetry endpoint (optional)
-export OTEL_EXPORTER_OTLP_ENDPOINT="localhost:4317"
-export OTEL_SERVICE_NAME="bantam"
+export OPENAI_MODEL="gpt-oss-20b"
 ```
 
 ## Usage
 
 ```bash
-./bantam
+# Interactive mode
+bantam run
+
+# One-shot prompt
+bantam prompt "your message here"
+
+# Session management
+bantam session list
+bantam session clear
 ```
-
-### CLI Commands
-
-- Type your message and press Enter
-- `/quit` or `/exit` - Exit the CLI
-- `/clear` - Clear session history
-
-### Initialization
-
-- `./bantam --init` - Initialize workspace (creates config.yaml and soul.md)
 
 ## Architecture
 
 ```
 bantam/
-├── bantam.go         # Entry point
-├── defaults/
-│   ├── soul.md       # Default agent identity (embedded)
-│   └── system-prompt.md
-├── agent/
-│   └── agent.go      # Core loop (unified routing)
-├── channel/
-│   └── cli.go        # CLI channel
-├── provider/
-│   └── openai.go     # OpenAI-compatible API
-├── session/
-│   └── manager.go    # Session management
-├── tools/
-│   ├── shell.go      # Shell commands
-│   ├── filesystem.go # File operations
-│   ├── time.go       # Time tool
-│   └── echo.go       # Echo test tool
-└── tracing/
-    └── otel.go       # OpenTelemetry integration
+├── cmd/              # Cobra command implementations
+├── agent/            # Core agent loop
+├── channel/          # Chat channel implementations (CLI, gateway)
+├── provider/         # LLM provider interface
+├── session/          # Session management (SQLite)
+├── tools/            # Tool definitions (shell, filesystem, time, echo)
+├── tracing/          # OpenTelemetry integration
+└── paths/            # Path configuration
 ```
 
 ## Size Goal
