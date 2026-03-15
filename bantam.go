@@ -281,16 +281,16 @@ provider:
  	ag := agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt)
 
 // Print startup status (only in interactive mode, not for --prompt)
-  	if *prompt == "" {
-  		// Load session to check if new or existing
- 		sess := sessions.GetOrCreate(*sessionKey)
- 		msgCount := len(sess.Messages)
- 		if msgCount == 0 {
- 			fmt.Printf("\033[90mWorkspace: %s | Session: %s | New\033[0m\n", workspace, *sessionKey)
- 		} else {
- 			fmt.Printf("\033[90mWorkspace: %s | Session: %s | %d messages\033[0m\n", workspace, *sessionKey, msgCount)
- 		}
- 	}
+   	if *prompt == "" {
+   		// Load session to check if new or existing
+  		sess := sessions.GetOrCreate(*sessionKey)
+  		msgCount := sess.MessageCount()
+  		if msgCount == 0 {
+  			fmt.Printf("\033[90mWorkspace: %s | Session: %s | New\033[0m\n", workspace, *sessionKey)
+  		} else {
+  			fmt.Printf("\033[90mWorkspace: %s | Session: %s | %d messages\033[0m\n", workspace, *sessionKey, msgCount)
+  		}
+  	}
 
 // Handle --list-sessions flag
  	if *listSessions {

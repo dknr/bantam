@@ -1,16 +1,18 @@
 package session
 
 import (
-  "encoding/json"
-  "fmt"
-  "os"
-  "path/filepath"
-  "strings"
-  "time"
-  "sync"
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	_ "modernc.org/sqlite"
 )
 
-// Manager manages conversation sessions.
+// Manager manages conversation sessions using SQLite.
 type Manager struct {
 	workspace  string
 	sessions   map[string]*Session
@@ -51,9 +53,12 @@ func (m *Manager) GetOrCreate(key string) *Session {
 	// Create new session
 	sess := &Session{
 		Key:       key,
-		Messages:  []Message{},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		createdAt: time.Now(),
+		updatedAt: time.Now(),
+	}
+	if err := sess.initDB(m.workspace); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize session DB: %v\n", err)
+		return nil
 	}
 	m.sessions[key] = sess
 	return sess
@@ -69,58 +74,57 @@ func (m *Manager) Save(sess *Session) {
 }
 
 func (m *Manager) saveLocked(sess *Session) {
-  	path := m.sessionPath(sess.Key)
-
-  	// Ensure directory exists
-  	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-  		fmt.Fprintf(os.Stderr, "Failed to create session directory: %v\n", err)
-  		return
-  	}
-
-  	// Write to temp file then rename for atomicity
-  	tmpPath := path + ".tmp"
-  	file, err := os.Create(tmpPath)
-  	if err != nil {
-  		fmt.Fprintf(os.Stderr, "Failed to create session file: %v\n", err)
-  		return
-  	}
-
-  	encoder := json.NewEncoder(file)
-  	encoder.SetIndent("", "  ")
-  	if err := encoder.Encode(sess); err != nil {
-  		file.Close()
-  		os.Remove(tmpPath)
-  		fmt.Fprintf(os.Stderr, "Failed to encode session: %v\n", err)
-  		return
-  	}
-
-  	file.Close()
-  	if err := os.Rename(tmpPath, path); err != nil {
-  		os.Remove(tmpPath)
-  		fmt.Fprintf(os.Stderr, "Failed to save session: %v\n", err)
-  	}
-  }
+	// SQLite handles persistence automatically
+	// This is just for in-memory cache update
+}
 
 func (m *Manager) load(key string) (*Session, error) {
 	path := m.sessionPath(key)
 
-	data, err := os.ReadFile(path)
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
 	}
 
-	var sess Session
-	if err := json.Unmarshal(data, &sess); err != nil {
+	// Check if sessions table exists
+	var tableName string
+	err = db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'").Scan(&tableName)
+	if err == sql.ErrNoRows {
+		db.Close()
+		return nil, fmt.Errorf("no messages table found")
+	} else if err != nil {
+		db.Close()
 		return nil, err
 	}
 
-	return &sess, nil
+sess := &Session{
+ 		Key:       key,
+ 		db:        db,
+ 		createdAt: time.Time{},
+ 		updatedAt: time.Time{},
+ 	}
+
+	// Get creation time
+	var createdAt string
+	err = db.QueryRow("SELECT created_at FROM sessions WHERE key = ?", key).Scan(&createdAt)
+	if err == nil {
+		sess.createdAt, _ = time.Parse(time.RFC3339, createdAt)
+	}
+
+	// Get last message time
+	var updatedAt string
+	err = db.QueryRow("SELECT timestamp FROM messages WHERE session_key = ? ORDER BY timestamp DESC LIMIT 1", key).Scan(&updatedAt)
+	if err == nil {
+		sess.updatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	}
+
+	return sess, nil
 }
 
 func (m *Manager) sessionPath(key string) string {
-  // Use simple key as filename (replace : with _)
-  safeKey := filepath.Base(key)
-  return filepath.Join(m.workspace, "sessions", safeKey+".json")
+	// Use simple key as filename (replace : with _)
+	safeKey := filepath.Base(key)
+	return filepath.Join(m.workspace, "sessions", safeKey+".db")
 }
 
 // SessionPath returns the file path for a session key (exported version).
@@ -128,28 +132,28 @@ func (m *Manager) SessionPath(key string) string {
 	return m.sessionPath(key)
 }
 
-// ListSessions returns a list of all session keys (filenames without .json).
+// ListSessions returns a list of all session keys (filenames without .db).
 func (m *Manager) ListSessions() []string {
 	sessionDir := filepath.Join(m.workspace, "sessions")
-	
+
 	// Check if session directory exists
 	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
 		return nil
 	}
-	
+
 	entries, err := os.ReadDir(sessionDir)
 	if err != nil {
 		return nil
 	}
-	
+
 	var sessions []string
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
-			// Remove .json extension
-			sessions = append(sessions, strings.TrimSuffix(entry.Name(), ".json"))
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".db") {
+			// Remove .db extension
+			sessions = append(sessions, strings.TrimSuffix(entry.Name(), ".db"))
 		}
 	}
-	
+
 	return sessions
 }
 
