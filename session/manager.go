@@ -1,16 +1,25 @@
 package session
 
-import (
-	"database/sql"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
+ import (
+ 	"database/sql"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
+ 	"sync"
+ 	"time"
 
-	_ "modernc.org/sqlite"
-)
+ 	_ "modernc.org/sqlite"
+ )
+
+ // sanitizeKey converts a session key to a safe filename.
+ func sanitizeKey(key string) string {
+ 	// Replace invalid filename characters
+ 	safe := strings.ReplaceAll(key, ":", "_")
+ 	safe = strings.ReplaceAll(safe, "/", "_")
+ 	safe = strings.ReplaceAll(safe, "\\", "_")
+ 	return safe
+ }
 
 // Manager manages conversation sessions using SQLite.
 type Manager struct {
@@ -122,10 +131,9 @@ sess := &Session{
 }
 
 func (m *Manager) sessionPath(key string) string {
-	// Use simple key as filename (replace : with _)
-	safeKey := filepath.Base(key)
-	return filepath.Join(m.workspace, "sessions", safeKey+".db")
-}
+  	safeKey := sanitizeKey(key)
+  	return filepath.Join(m.workspace, "sessions", safeKey+".db")
+  }
 
 // SessionPath returns the file path for a session key (exported version).
 func (m *Manager) SessionPath(key string) string {
@@ -182,18 +190,21 @@ func (m *Manager) Clear() error {
 }
 
 // ClearSession removes a specific session from memory and disk.
-func (m *Manager) ClearSession(key string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Remove from memory
-	delete(m.sessions, key)
-
-	// Remove from disk
-	path := m.sessionPath(key)
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	return nil
-}
+ func (m *Manager) ClearSession(key string) error {
+ 	m.mu.Lock()
+ 	defer m.mu.Unlock()
+ 
+ 	// Remove from memory (and close any open DB connections)
+ 	if sess, exists := m.sessions[key]; exists {
+ 		sess.Close()
+ 	}
+ 	delete(m.sessions, key)
+ 
+ 	// Remove from disk
+ 	path := m.sessionPath(key)
+ 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+ 		return err
+ 	}
+ 
+ 	return nil
+ }

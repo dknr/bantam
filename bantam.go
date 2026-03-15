@@ -350,8 +350,8 @@ provider:
  		os.Exit(0)
  	}
 
-	// Create CLI channel
-	cli := channel.NewCLIChannel(sessions)
+// Create CLI channel
+  	cli := channel.NewCLIChannel(sessions, *sessionKey)
 
 	// Create a context that can be cancelled for graceful shutdown
 	ctx, cancel := context.WithCancel(ctx)
@@ -361,12 +361,12 @@ provider:
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start CLI channel
-	go func() {
-		err := cli.Start(ctx, func(ctx context.Context, chatID, content string) error {
-			// Process message through unified agent loop
-			logger := logging.FromContext(ctx)
-			response, stats, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
+// Start CLI channel
+  	go func() {
+ 		err := cli.Start(ctx, func(ctx context.Context, sessionKey, chatID, content string) error {
+ 			// Process message through unified agent loop
+ 			logger := logging.FromContext(ctx)
+ 			response, stats, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
 			if err != nil {
 				logger.Error(err, "failed to process message")
 				fmt.Printf("\033[31mError: %v\033[0m\n\n", err)

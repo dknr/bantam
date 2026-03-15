@@ -2,14 +2,14 @@
 package session
 
 import (
-	"database/sql"
-	"fmt"
-	"os"
-	"path/filepath"
-	"time"
+ 	"database/sql"
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
+ 	"time"
 
-	_ "modernc.org/sqlite"
-)
+ 	_ "modernc.org/sqlite"
+ )
 
 // Message represents a single message in a session.
 type Message struct {
@@ -27,19 +27,18 @@ type Session struct {
 	updatedAt time.Time
 }
 
-// initDB creates the database and tables if they don't exist.
 func (s *Session) initDB(workspace string) error {
-	dbPath := filepath.Join(workspace, "sessions", filepath.Base(s.Key)+".db")
-
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
-		return err
-	}
-
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return err
-	}
+ 	dbPath := filepath.Join(workspace, "sessions", sanitizeKey(s.Key)+".db")
+ 
+ 	// Ensure directory exists
+ 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+ 		return err
+ 	}
+ 
+ 	db, err := sql.Open("sqlite", dbPath)
+ 	if err != nil {
+ 		return err
+ 	}
 
 	// Create sessions table
 	_, err = db.Exec(`
@@ -206,9 +205,11 @@ func (s *Session) Clear() {
 }
 
 // Close closes the database connection.
-func (s *Session) Close() error {
-	if s.db != nil {
-		return s.db.Close()
-	}
-	return nil
-}
+ func (s *Session) Close() error {
+ 	if s.db != nil {
+ 		err := s.db.Close()
+ 		s.db = nil
+ 		return err
+ 	}
+ 	return nil
+ }
