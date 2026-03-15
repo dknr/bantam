@@ -282,47 +282,65 @@ provider:
  		systemPrompt = string(soulContent)
  	}
 
-	// Create agent
-	ag := agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt)
+// Create agent
+ 	ag := agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt)
 
-	// Handle --list-sessions flag
-	if *listSessions {
-		sessionsList := sessions.ListSessions()
-		if len(sessionsList) == 0 {
-			fmt.Println("No sessions found.")
-		} else {
-			fmt.Println("Sessions:")
-			for _, s := range sessionsList {
-				fmt.Printf("  - %s\n", s)
-			}
-		}
-		os.Exit(0)
-	}
+ 	// Print startup status (only in interactive mode, not for --prompt)
+ 	if *prompt == "" {
+ 		fmt.Printf("\n\033[90m=== Bantam CLI ===\033[0m\n")
+ 		fmt.Printf("Workspace: %s\n", workspace)
+ 		fmt.Printf("Session: %s\n", *sessionKey)
+ 		soulPath := workspace + "/soul.md"
+ 		if _, err := os.Stat(soulPath); err == nil {
+ 			fmt.Printf("Identity: soul.md loaded\n")
+ 		} else {
+ 			fmt.Printf("Identity: using default\n")
+ 		}
+ 		fmt.Printf("Type your message (or /quit to exit)\n\n")
+ 	}
 
-	// Handle --clear flag (clear default session only)
-	if *clear {
-		sessionPath := sessions.SessionPath(*sessionKey)
-		if err := os.Remove(sessionPath); err != nil {
-			if os.IsNotExist(err) {
-				fmt.Printf("Session %s does not exist.\n", *sessionKey)
-			} else {
-				logger.Error(err, "failed to clear session", "session", *sessionKey)
-				os.Exit(1)
-			}
-		}
-		fmt.Printf("Session %s cleared.\n", *sessionKey)
-		os.Exit(0)
-	}
+// Handle --list-sessions flag
+ 	if *listSessions {
+ 		sessionsList := sessions.ListSessions()
+ 		if len(sessionsList) == 0 {
+ 			fmt.Println("No sessions found.")
+ 		} else {
+ 			fmt.Println("Sessions:")
+ 			for _, s := range sessionsList {
+ 				fmt.Printf("  - %s\n", s)
+ 			}
+ 		}
+ 		os.Exit(0)
+ 	}
 
-	// Handle --clear-all flag
-	if *clearAll {
-		if err := sessions.Clear(); err != nil {
-			logger.Error(err, "failed to clear sessions")
-			os.Exit(1)
-		}
-		fmt.Println("All sessions cleared.")
-		os.Exit(0)
-	}
+// Handle --clear flag (clear default session only)
+  	if *clear {
+  		sessionPath := sessions.SessionPath(*sessionKey)
+ 		if err := os.Remove(sessionPath); err != nil {
+ 			if os.IsNotExist(err) {
+ 				fmt.Printf("Session %s does not exist.\n", *sessionKey)
+ 			} else {
+ 				logger.Error(err, "failed to clear session", "session", *sessionKey)
+ 				os.Exit(1)
+ 			}
+ 		}
+ 		fmt.Printf("\n\033[90m=== Session Cleared ===\033[0m\n")
+ 		fmt.Printf("Session %s cleared.\n", *sessionKey)
+ 		fmt.Printf("Type your message (or /quit to exit)\n\n")
+ 		os.Exit(0)
+ 	}
+
+// Handle --clear-all flag
+ 	if *clearAll {
+ 		if err := sessions.Clear(); err != nil {
+ 			logger.Error(err, "failed to clear sessions")
+ 			os.Exit(1)
+ 		}
+ 		fmt.Printf("\n\033[90m=== All Sessions Cleared ===\033[0m\n")
+ 		fmt.Printf("All sessions cleared. Starting fresh.\n")
+ 		fmt.Printf("Type your message (or /quit to exit)\n\n")
+ 		os.Exit(0)
+ 	}
 
 	// Handle --prompt flag (one-shot mode)
 	if *prompt != "" {

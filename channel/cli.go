@@ -35,8 +35,7 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	reader := bufio.NewReader(os.Stdin)
 	chatID := "direct" // CLI is always direct chat
 
-	fmt.Println("Bantam CLI - Type your message (or /quit to exit)")
-	fmt.Print("> ")
+fmt.Print("> ")
 
 	for c.running {
 		line, err := reader.ReadString('\n')
