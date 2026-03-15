@@ -27,7 +27,7 @@
 **Issue:** Agent doesn't know its workspace directory, gets "lost"
 **Plan:**
 - Set working directory to configured workspace on startup
-- Pass workspace to tools (filesystem already does this)
+- Pass workspace to tools (file already does this)
 - Ensure all operations use absolute paths within workspace
 
 ## High Priority

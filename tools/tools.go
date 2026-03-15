@@ -84,22 +84,22 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 				"description": "The message to echo back",
 			}
 			schema["required"] = []string{"message"}
-		case "shell":
+		case "exec":
 			schema["properties"].(map[string]any)["command"] = map[string]any{
 				"type":        "string",
-				"description": "The shell command to execute",
+				"description": "The command to execute",
 			}
 			schema["required"] = []string{"command"}
-		case "filesystem":
-			schema["properties"].(map[string]any)["operation"] = map[string]any{
+		case "file":
+			schema["properties"].(map[string]any)["action"] = map[string]any{
 				"type":        "string",
-				"description": "The operation to perform: read, write, or list",
+				"description": "The action to perform: read, write, or list",
 			}
 			schema["properties"].(map[string]any)["path"] = map[string]any{
 				"type":        "string",
 				"description": "The file or directory path",
 			}
-			schema["required"] = []string{"operation", "path"}
+			schema["required"] = []string{"action", "path"}
 		}
 
 		defs = append(defs, map[string]any{

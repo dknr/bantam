@@ -52,7 +52,7 @@ bantam/
 ├── channel/          # Chat channel implementations (CLI, gateway)
 ├── provider/         # LLM provider interface
 ├── session/          # Session management (SQLite)
-├── tools/            # Tool definitions (shell, filesystem, time, echo)
+├── tools/            # Tool definitions (exec, file, time, echo)
 ├── tracing/          # OpenTelemetry integration
 └── paths/            # Path configuration
 ```
