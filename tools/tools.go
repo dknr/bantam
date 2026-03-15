@@ -6,10 +6,15 @@ import (
 )
 
 // Tool is an interface for agent tools.
-type Tool interface {
-	Name() string
-	Execute(ctx context.Context, args map[string]any) (any, error)
-}
+ type Tool interface {
+ 	Name() string
+ 	Execute(ctx context.Context, args map[string]any) (any, error)
+ }
+
+ // StatusLineTool is an optional interface for tools that can provide a status line.
+ type StatusLineTool interface {
+ 	StatusLine(args map[string]any) string
+ }
 
 // Registry holds available tools.
 type Registry struct {

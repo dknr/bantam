@@ -18,11 +18,27 @@ func NewFileSystemTool(workspace string) *FileSystemTool {
 }
 
 // Name returns the tool name.
-func (t *FileSystemTool) Name() string {
-	return "filesystem"
-}
+ func (t *FileSystemTool) Name() string {
+ 	return "filesystem"
+ }
 
-// Execute performs file operations.
+ // StatusLine returns a formatted status line for the filesystem operation.
+ func (t *FileSystemTool) StatusLine(args map[string]any) string {
+ 	op, _ := args["operation"].(string)
+ 	path, _ := args["path"].(string)
+ 	switch op {
+ 	case "read":
+ 		return fmt.Sprintf("filesystem> read %s", path)
+ 	case "write":
+ 		return fmt.Sprintf("filesystem> write %s", path)
+ 	case "list":
+ 		return fmt.Sprintf("filesystem> list %s", path)
+ 	default:
+ 		return fmt.Sprintf("filesystem> %s (unknown)", path)
+ 	}
+ }
+
+ // Execute performs file operations.
 func (t *FileSystemTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	op, ok := args["operation"].(string)
 	if !ok {

@@ -345,10 +345,10 @@ provider:
 			os.Exit(1)
 		}
 
-		// Print response with header
-		printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs))
-		os.Exit(0)
-	}
+// Print response with header
+ 		printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
+ 		os.Exit(0)
+ 	}
 
 	// Create CLI channel
 	cli := channel.NewCLIChannel(sessions)
@@ -374,7 +374,7 @@ provider:
 			}
 
 // Print response with header
- 			printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs))
+  			printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
 
  			return nil
 		})
@@ -400,24 +400,42 @@ provider:
  	}
  }
 
-// printResponse prints the LLM response with a header showing time and token stats
-func printResponse(ctx context.Context, response string, tokens map[string]int, durationMs float64) {
-	fmt.Printf("\n\033[90m%s | ", time.Now().Format("15:04:05"))
-	printTokenStats(tokens, durationMs)
-	fmt.Println("\033[0m")
-	fmt.Printf("\033[36m%s\033[0m\n\n", response)
-}
+// printResponse prints the LLM response with stats at the bottom
+    func printResponse(ctx context.Context, response string, tokens map[string]int, durationMs float64, timing interface{}) {
+    	fmt.Printf("\033[36m%s\033[0m\n", response)
+    	fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
+    	printTokenStats(tokens, durationMs, timing)
+    	fmt.Println("\033[0m")
+    }
 
-// printTokenStats prints token usage statistics
- func printTokenStats(tokens map[string]int, durationMs float64) {
- 	inputTokens := 0
- 	outputTokens := 0
- 	if v, ok := tokens["prompt"]; ok {
- 		inputTokens = v
- 	}
- 	if v, ok := tokens["completion"]; ok {
- 		outputTokens = v
- 	}
- 	totalTokens := inputTokens + outputTokens
- 	fmt.Printf("%d tokens (%d in, %d out) | %.1fs", totalTokens, inputTokens, outputTokens, durationMs/1000)
- }
+// printTokenStats prints token usage statistics with provider timing data
+   func printTokenStats(tokens map[string]int, durationMs float64, timing interface{}) {
+   	inputTokens := 0
+   	outputTokens := 0
+   	if v, ok := tokens["prompt"]; ok {
+   		inputTokens = v
+   	}
+   	if v, ok := tokens["completion"]; ok {
+   		outputTokens = v
+   	}
+   	totalTokens := inputTokens + outputTokens
+
+   	// Use provider timing data if available
+   	if timingMap, ok := timing.(map[string]any); ok {
+   		if promptPerSec, ok := timingMap["prompt_per_second"].(float64); ok {
+   			if predictedPerSec, ok := timingMap["predicted_per_second"].(float64); ok {
+   				fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, promptPerSec, outputTokens, predictedPerSec, totalTokens, durationMs/1000)
+   				return
+   			}
+   		}
+   	}
+
+   	// Fallback: calculate rates from duration
+   	var inputRate, outputRate float64
+   	if durationMs > 0 {
+   		inputRate = float64(inputTokens) / (durationMs / 1000.0)
+   		outputRate = float64(outputTokens) / (durationMs / 1000.0)
+   	}
+
+   	fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, inputRate, outputTokens, outputRate, totalTokens, durationMs/1000)
+   }

@@ -34,17 +34,16 @@ func NewOpenAIProvider(apiKey, apiBase, model string) *OpenAIProvider {
 }
 
 // Chat sends a chat completion request to the OpenAI-compatible API.
-   	func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, tools []map[string]any) (*Response, error) {
-   		// Create span for this LLM call
-   		ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.provider_call", map[string]string{
-   			"model":          p.model,
-   			"messages_count": fmt.Sprintf("%d", len(messages)),
-   			"tools_count":    fmt.Sprintf("%d", len(tools)),
-   		})
-   		if chatSpan != nil {
-   			defer chatSpan.End()
-   			chatSpan.SetAttributes(attribute.String("llm.model", p.model))
-   		}
+  	func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, tools []map[string]any) (*Response, error) {
+    		// Create span for this LLM call
+    		ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.provider_call", map[string]string{
+    			"model":          p.model,
+    			"messages_count": fmt.Sprintf("%d", len(messages)),
+    			"tools_count":    fmt.Sprintf("%d", len(tools)),
+    		})
+    		if chatSpan != nil {
+    			chatSpan.SetAttributes(attribute.String("llm.model", p.model))
+    		}
 
  reqBody := map[string]any{
  		"model":    p.model,
@@ -75,12 +74,13 @@ func NewOpenAIProvider(apiKey, apiBase, model string) *OpenAIProvider {
 
 resp, err := p.httpClient.Do(req)
    	if err != nil {
-   		if chatSpan != nil {
-   			chatSpan.SetStatus(codes.Error, err.Error())
-   		}
-   		return nil, fmt.Errorf("HTTP request failed: %w", err)
-   	}
-	defer resp.Body.Close()
+    		if chatSpan != nil {
+    			chatSpan.SetStatus(codes.Error, err.Error())
+    			chatSpan.End()
+    		}
+    		return nil, fmt.Errorf("HTTP request failed: %w", err)
+    	}
+ 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -88,8 +88,12 @@ resp, err := p.httpClient.Do(req)
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
-	}
+ 		if chatSpan != nil {
+ 			chatSpan.SetStatus(codes.Error, "non-200 status code")
+ 			chatSpan.End()
+ 		}
+ 		return nil, fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
+ 	}
 
 	// Log request and response in verbose mode
 	if logging.IsVerbose(ctx) {
@@ -99,27 +103,43 @@ resp, err := p.httpClient.Do(req)
 		logging.PrintJSON("Provider Response", apiResult)
 	}
 
-	var apiResult map[string]any
-	if err := json.Unmarshal(body, &apiResult); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
+var apiResult map[string]any
+ 	if err := json.Unmarshal(body, &apiResult); err != nil {
+ 		if chatSpan != nil {
+ 			chatSpan.SetStatus(codes.Error, "failed to parse response")
+ 			chatSpan.End()
+ 		}
+ 		return nil, fmt.Errorf("failed to parse response: %w", err)
+ 	}
 
-	// Extract choices[0].message
-	choices, ok := apiResult["choices"].([]any)
-	if !ok || len(choices) == 0 {
-		return nil, fmt.Errorf("no choices in response")
-	}
+ 	// Extract choices[0].message
+ 	choices, ok := apiResult["choices"].([]any)
+ 	if !ok || len(choices) == 0 {
+ 		if chatSpan != nil {
+ 			chatSpan.SetStatus(codes.Error, "no choices in response")
+ 			chatSpan.End()
+ 		}
+ 		return nil, fmt.Errorf("no choices in response")
+ 	}
 
-	choice, ok := choices[0].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("invalid choice format")
-	}
+ 	choice, ok := choices[0].(map[string]any)
+ 	if !ok {
+ 		if chatSpan != nil {
+ 			chatSpan.SetStatus(codes.Error, "invalid choice format")
+ 			chatSpan.End()
+ 		}
+ 		return nil, fmt.Errorf("invalid choice format")
+ 	}
 
-	// Message object is nested under "message" key
-	message, ok := choice["message"].(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("invalid message format in choice")
-	}
+ 	// Message object is nested under "message" key
+ 	message, ok := choice["message"].(map[string]any)
+ 	if !ok {
+ 		if chatSpan != nil {
+ 			chatSpan.SetStatus(codes.Error, "invalid message format in choice")
+ 			chatSpan.End()
+ 		}
+ 		return nil, fmt.Errorf("invalid message format in choice")
+ 	}
 
 	content, _ := message["content"].(string)
 
@@ -155,29 +175,52 @@ resp, err := p.httpClient.Do(req)
 		finishReason = fr
 	}
 
-	// Extract token usage from response
-	tokens := make(map[string]int)
-	if usage, ok := apiResult["usage"].(map[string]any); ok {
-		if v, ok := usage["prompt_tokens"].(float64); ok {
-			tokens["prompt"] = int(v)
-		}
-		if v, ok := usage["completion_tokens"].(float64); ok {
-			tokens["completion"] = int(v)
-		}
-		if v, ok := usage["total_tokens"].(float64); ok {
-			tokens["total"] = int(v)
-		}
-	}
+// Extract token usage from response
+ 	tokens := make(map[string]int)
+ 	if usage, ok := apiResult["usage"].(map[string]any); ok {
+ 		if v, ok := usage["prompt_tokens"].(float64); ok {
+ 			tokens["prompt"] = int(v)
+ 		}
+ 		if v, ok := usage["completion_tokens"].(float64); ok {
+ 			tokens["completion"] = int(v)
+ 		}
+ 		if v, ok := usage["total_tokens"].(float64); ok {
+ 			tokens["total"] = int(v)
+ 		}
+ 	}
 
-llmResponse := NewResponse(content, toolCalls, finishReason)
-   	llmResponse.SetTokens(tokens)
-   	chatSpan.SetAttributes(attribute.Int("llm.token.prompt", tokens["prompt"]))
-   	chatSpan.SetAttributes(attribute.Int("llm.token.completion", tokens["completion"]))
-   	chatSpan.SetAttributes(attribute.Int("llm.token.total", tokens["total"]))
-   	chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(len(toolCalls) > 0)))
-   	chatSpan.SetAttributes(attribute.Int("response.content_length", len(content)))
-   	return llmResponse, nil
-   }
+ // Extract timing info if available (llama.cpp and some providers)
+ 	var timing *Timing
+ 	if timings, ok := apiResult["timings"].(map[string]any); ok {
+ 		t := &Timing{}
+ 		if v, ok := timings["prompt_ms"].(float64); ok {
+ 			t.PromptMs = v
+ 		}
+ 		if v, ok := timings["prompt_per_second"].(float64); ok {
+ 			t.PromptPerSecond = v
+ 		}
+ 		if v, ok := timings["predicted_ms"].(float64); ok {
+ 			t.PredictedMs = v
+ 		}
+ 		if v, ok := timings["predicted_per_second"].(float64); ok {
+ 			t.PredictedPerSecond = v
+ 		}
+ 		timing = t
+ 	}
+
+ 	llmResponse := NewResponse(content, toolCalls, finishReason)
+    	llmResponse.SetTokens(tokens)
+    	llmResponse.SetTiming(timing)
+    	if chatSpan != nil {
+     		chatSpan.SetAttributes(attribute.Int("llm.token.prompt", tokens["prompt"]))
+     		chatSpan.SetAttributes(attribute.Int("llm.token.completion", tokens["completion"]))
+     		chatSpan.SetAttributes(attribute.Int("llm.token.total", tokens["total"]))
+     		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(len(toolCalls) > 0)))
+     		chatSpan.SetAttributes(attribute.Int("response.content_length", len(content)))
+     		chatSpan.End()
+     	}
+     	return llmResponse, nil
+    }
 
   // boolToInt converts bool to int for OpenTelemetry attributes.
   func boolToInt(b bool) int {

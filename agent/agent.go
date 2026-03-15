@@ -42,10 +42,11 @@ func NewWithSystemPrompt(p provider.Provider, tools *tools.Registry, sessions *s
 }
 
 // ProcessStats contains timing and token information.
-type ProcessStats struct {
-	DurationMs int
-	Tokens     map[string]int
-}
+ type ProcessStats struct {
+ 	DurationMs int
+ 	Tokens     map[string]int
+ 	Timing     interface{} // Provider timing data (map from API response)
+ }
 
 // ProcessMessage handles a single message from any source (CLI, gateway, etc.).
 //
@@ -105,39 +106,40 @@ func (a *Agent) ProcessMessageWithStats(ctx context.Context, channel, chatID, co
 ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.chat", map[string]string{
   			"messages_count": fmt.Sprintf("%d", len(messages)),
   		})
-  	resp, err := a.provider.Chat(ctx, messages, a.toolRegistry.DefinitionsWithSchema())
-  	durationMs := time.Since(startTime).Milliseconds()
-  	if chatSpan != nil {
-  		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(resp.HasToolCalls())))
-  		chatSpan.SetAttributes(attribute.Int("response.content_length", len(resp.Content())))
-  		chatSpan.End()
-  	}
-	if err != nil {
-		logger.Error(err, "LLM chat failed")
-		return "", ProcessStats{}, fmt.Errorf("LLM error: %w", err)
-	}
-logger.Info("LLM response received", "has_tool_calls", resp.HasToolCalls(), "content_length", len(resp.Content()), "duration_ms", durationMs)
+resp, err := a.provider.Chat(ctx, messages, a.toolRegistry.DefinitionsWithSchema())
+   	durationMs := time.Since(startTime).Milliseconds()
+   	if err != nil {
+ 		if chatSpan != nil {
+ 			chatSpan.SetStatus(codes.Error, err.Error())
+ 			chatSpan.End()
+ 		}
+ 		logger.Error(err, "LLM chat failed")
+ 		return "", ProcessStats{}, fmt.Errorf("LLM error: %w", err)
+ 	}
+   	if chatSpan != nil {
+   		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(resp.HasToolCalls())))
+   		chatSpan.SetAttributes(attribute.Int("response.content_length", len(resp.Content())))
+   		chatSpan.End()
+   	}
+ logger.Info("LLM response received", "has_tool_calls", resp.HasToolCalls(), "content_length", len(resp.Content()), "duration_ms", durationMs)
 
 // Handle tool calls - loop until no more tool calls (supports iterative tool calling)
-         var tokens map[string]int
-         for resp.HasToolCalls() {
-             // Print tool calls in yellow
-             for _, call := range resp.ToolCalls() {
-                 // Special formatting for filesystem tool to show operation
-                 if call.Name == "filesystem" {
-                     if op, ok := call.Arguments["operation"].(string); ok {
-                         fmt.Printf("\033[33m[Tool Call: filesystem (%s)]\033[0m\n", op)
-                     } else {
-                         fmt.Printf("\033[33m[Tool Call: filesystem (unknown operation)]\033[0m\n")
-                     }
-                 } else {
-                     fmt.Printf("\033[33m[Tool Call: %s]\033[0m\n", call.Name)
-                 }
-                 for argName, argValue := range call.Arguments {
-                     fmt.Printf("\033[33m  %s: %v\033[0m\n", argName, argValue)
-                 }
-                 fmt.Println()
-             }
+           var tokens map[string]int
+           for resp.HasToolCalls() {
+               // Print tool calls with status lines if available
+               for _, call := range resp.ToolCalls() {
+                   tool, exists := a.toolRegistry.Get(call.Name)
+                   if exists {
+                       // Check if tool implements StatusLine
+                       if statusTool, ok := tool.(tools.StatusLineTool); ok {
+                           fmt.Printf("\033[33m%s\033[0m\n", statusTool.StatusLine(call.Arguments))
+                       } else {
+                           fmt.Printf("\033[33m%s(%v)\033[0m\n", call.Name, call.Arguments)
+                       }
+                   } else {
+                       fmt.Printf("\033[33m%s(%v)\033[0m\n", call.Name, call.Arguments)
+                   }
+               }
 
             // Save the assistant's tool call request message to session
             // The assistant message with tool calls needs to be preserved for conversation history
@@ -173,12 +175,12 @@ logger.Info("LLM response received", "has_tool_calls", resp.HasToolCalls(), "con
                 return "", ProcessStats{}, fmt.Errorf("LLM error: %w", err)
             }
             
-            // Print intermediate response (cyan) if there's content and there are more tool calls coming
-            // If no more tool calls, this is the final response which printResponse will handle
-            if resp.Content() != "" && resp.HasToolCalls() {
-                fmt.Printf("\033[36m%s\033[0m\n", resp.Content())
-            }
-        }
+// Print intermediate response (cyan with indent) if there's content and there are more tool calls coming
+             // If no more tool calls, this is the final response which printResponse will handle
+             if resp.Content() != "" && resp.HasToolCalls() {
+                 fmt.Printf("\033[36m> %s\033[0m\n", resp.Content())
+             }
+         }
 
 	// Get token details from response
  	tokens = resp.TokenDetails()
@@ -207,8 +209,11 @@ responseContent := resp.Content()
 		logging.PrintJSON("Response", respData)
 	}
 
-return responseContent, ProcessStats{DurationMs: int(durationMs), Tokens: tokens}, nil
-  }
+// Get timing data from response
+   	timing := resp.Timing()
+    
+    return responseContent, ProcessStats{DurationMs: int(durationMs), Tokens: tokens, Timing: timing}, nil
+   }
 
 // buildMessages constructs the message history for the LLM.
   	func (a *Agent) buildMessages(sess *session.Session) []map[string]any {

@@ -1,14 +1,22 @@
 package tools
 
-import (
-	"context"
-	"fmt"
-	"os/exec"
-	"strings"
-)
+ import (
+ 	"context"
+ 	"fmt"
+ 	"os/exec"
+ 	"strings"
+ )
 
-// ShellTool executes shell commands.
-type ShellTool struct{}
+ // ShellTool executes shell commands.
+ type ShellTool struct{}
+
+ // StatusLine returns a formatted status line for the shell command.
+ func (t *ShellTool) StatusLine(args map[string]any) string {
+ 	if cmd, ok := args["command"].(string); ok {
+ 		return fmt.Sprintf("shell> %s", cmd)
+ 	}
+ 	return "shell> (unknown command)"
+ }
 
 // NewShellTool creates a new shell tool.
 func NewShellTool() *ShellTool {
