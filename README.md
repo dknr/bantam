@@ -15,7 +15,7 @@ Bantam is a lightweight AI agent with unified message routing.
 ```bash
 git clone https://github.com/dknr/bantam.git
 cd bantam
-go build -o bantam main/main.go
+go build -o bantam .
 ```
 
 ## Configuration
@@ -47,11 +47,18 @@ export OTEL_SERVICE_NAME="bantam"
 - `/quit` or `/exit` - Exit the CLI
 - `/clear` - Clear session history
 
+### Initialization
+
+- `./bantam --init` - Initialize workspace (creates config.yaml and soul.md)
+
 ## Architecture
 
 ```
 bantam/
-├── main.go           # Entry point
+├── bantam.go         # Entry point
+├── defaults/
+│   ├── soul.md       # Default agent identity (embedded)
+│   └── system-prompt.md
 ├── agent/
 │   └── agent.go      # Core loop (unified routing)
 ├── channel/
@@ -62,7 +69,9 @@ bantam/
 │   └── manager.go    # Session management
 ├── tools/
 │   ├── shell.go      # Shell commands
-│   └── filesystem.go # File operations
+│   ├── filesystem.go # File operations
+│   ├── time.go       # Time tool
+│   └── echo.go       # Echo test tool
 └── tracing/
     └── otel.go       # OpenTelemetry integration
 ```
