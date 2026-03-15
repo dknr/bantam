@@ -409,33 +409,25 @@ provider:
     }
 
 // printTokenStats prints token usage statistics with provider timing data
-   func printTokenStats(tokens map[string]int, durationMs float64, timing interface{}) {
-   	inputTokens := 0
-   	outputTokens := 0
-   	if v, ok := tokens["prompt"]; ok {
-   		inputTokens = v
-   	}
-   	if v, ok := tokens["completion"]; ok {
-   		outputTokens = v
-   	}
-   	totalTokens := inputTokens + outputTokens
+    func printTokenStats(tokens map[string]int, durationMs float64, timing interface{}) {
+    	inputTokens := 0
+    	outputTokens := 0
+    	if v, ok := tokens["prompt"]; ok {
+    		inputTokens = v
+    	}
+    	if v, ok := tokens["completion"]; ok {
+    		outputTokens = v
+    	}
+    	totalTokens := inputTokens + outputTokens
 
-   	// Use provider timing data if available
-   	if timingMap, ok := timing.(map[string]any); ok {
-   		if promptPerSec, ok := timingMap["prompt_per_second"].(float64); ok {
-   			if predictedPerSec, ok := timingMap["predicted_per_second"].(float64); ok {
-   				fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, promptPerSec, outputTokens, predictedPerSec, totalTokens, durationMs/1000)
-   				return
-   			}
-   		}
-   	}
+    	// Use provider timing data if available (Timing struct)
+    	if timingStruct, ok := timing.(*provider.Timing); ok {
+    		if timingStruct != nil && timingStruct.PromptPerSecond > 0 && timingStruct.PredictedPerSecond > 0 {
+    			fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, timingStruct.PromptPerSecond, outputTokens, timingStruct.PredictedPerSecond, totalTokens, durationMs/1000)
+    			return
+    		}
+    	}
 
-   	// Fallback: calculate rates from duration
-   	var inputRate, outputRate float64
-   	if durationMs > 0 {
-   		inputRate = float64(inputTokens) / (durationMs / 1000.0)
-   		outputRate = float64(outputTokens) / (durationMs / 1000.0)
-   	}
-
-   	fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, inputRate, outputTokens, outputRate, totalTokens, durationMs/1000)
-   }
+    	// Provider didn't provide timing, just show token counts
+    	fmt.Printf("%d => %d => %d tokens (%.1fs)", inputTokens, outputTokens, totalTokens, durationMs/1000)
+    }
