@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
@@ -12,6 +11,7 @@ import (
 	"github.com/dknr/bantam/provider"
 	bantsession "github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
+	"github.com/dknr/bantam/tracing"
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -44,13 +44,13 @@ var rootCmd = &cobra.Command{
 	Use:   "bantam",
 	Short: "Bantam - A lightweight agent with unified message routing",
 	Long: `Bantam is a lightweight agent with unified message routing to avoid
-OpenTelemetry tracing issues experienced with separate gateway/CLI code paths.
-
-Usage:
-  bantam run           - Start interactive mode
-  bantam prompt        - Send a single message and exit
-  bantam session       - Session management commands
-  bantam init          - Initialize workspace and config`,
+ OpenTelemetry tracing issues experienced with separate gateway/CLI code paths.
+ 
+ Usage:
+   bantam run           - Start interactive mode
+   bantam prompt        - Send a single message and exit
+   bantam session       - Session management commands
+   bantam init          - Initialize workspace and config`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize paths (uses baseDir/workspace flags or defaults)
 		if err := paths.Init(baseDir, workspace); err != nil {
@@ -157,59 +157,27 @@ func getAgent(logger logr.Logger) (*agent.Agent, error) {
 	return agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt), nil
 }
 
-// getProvider creates and returns a configured provider
-func getProvider(logger logr.Logger) (provider.Provider, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	apiBase := os.Getenv("OPENAI_API_BASE")
-	model := os.Getenv("OPENAI_MODEL")
-	if model == "" {
-		model = "gpt-oss-20b"
-	}
-
-	if apiBase == "" {
-		logger.Info("OPENAI_API_BASE not set, assuming local Ollama at http://localhost:11434/v1")
-		apiBase = "http://localhost:11434/v1"
-	}
-
-	return provider.NewOpenAIProvider(apiKey, apiBase, model), nil
-}
-
-// getSessionManager creates and returns a session manager
-func getSessionManager() *bantsession.Manager {
-	return bantsession.NewManager(paths.SessionsDir)
-}
-
 // getCLIChannel creates and returns a CLI channel
 func getCLIChannel(sessions *bantsession.Manager) *channel.CLIChannel {
 	return channel.NewCLIChannel(sessions, sessionKey)
 }
 
-// printResponse prints the LLM response with stats
-func printResponse(response string, tokens map[string]int, durationMs float64, timing interface{}) {
-	fmt.Printf("\033[36m%s\033[0m\n", response)
-	fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
-	printTokenStats(tokens, durationMs, timing)
-	fmt.Println("\033[0m")
-}
-
-// printTokenStats prints token usage statistics
-func printTokenStats(tokens map[string]int, durationMs float64, timing interface{}) {
-	inputTokens := 0
-	outputTokens := 0
-	if v, ok := tokens["prompt"]; ok {
-		inputTokens = v
+// setupTracing configures OpenTelemetry tracing.
+func setupTracing(logger logr.Logger) error {
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	otelServiceName := os.Getenv("OTEL_SERVICE_NAME")
+	if otelServiceName == "" {
+		otelServiceName = "bantam"
 	}
-	if v, ok := tokens["completion"]; ok {
-		outputTokens = v
-	}
-	totalTokens := inputTokens + outputTokens
 
-	if timingStruct, ok := timing.(*provider.Timing); ok {
-		if timingStruct != nil && timingStruct.PromptPerSecond > 0 && timingStruct.PredictedPerSecond > 0 {
-			fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, timingStruct.PromptPerSecond, outputTokens, timingStruct.PredictedPerSecond, totalTokens, durationMs/1000)
-			return
+	// Strip http:// or https:// prefix from endpoint for gRPC
+	if otelEndpoint != "" {
+		if len(otelEndpoint) > 7 && otelEndpoint[:7] == "http://" {
+			otelEndpoint = otelEndpoint[7:]
+		} else if len(otelEndpoint) > 8 && otelEndpoint[:8] == "https://" {
+			otelEndpoint = otelEndpoint[8:]
 		}
 	}
 
-	fmt.Printf("%d => %d => %d tokens (%.1fs)", inputTokens, outputTokens, totalTokens, durationMs/1000)
+	return tracing.SetupOTEL(otelEndpoint, otelServiceName)
 }
