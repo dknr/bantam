@@ -18,6 +18,40 @@ func NewFileTool(workspace string) *FileTool {
 	return &FileTool{workspace: workspace}
 }
 
+// validatePath ensures the resolved path is within the workspace directory.
+func (t *FileTool) validatePath(relPath string) (string, error) {
+	// Clean the path to resolve any .. or .
+	cleanPath := filepath.Clean(relPath)
+
+	// Join with workspace and get absolute path
+	absPath := filepath.Join(t.workspace, cleanPath)
+
+	// Get absolute path of workspace
+	absWorkspace, err := filepath.Abs(t.workspace)
+	if err != nil {
+		return "", fmt.Errorf("invalid workspace: %w", err)
+	}
+
+	// Get absolute path of the target
+	absTarget, err := filepath.Abs(absPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+
+	// Check if target is within workspace using filepath.Rel
+	rel, err := filepath.Rel(absWorkspace, absTarget)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+
+	// If the relative path starts with .., it's outside the workspace
+	if strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("path traversal not allowed: %s", relPath)
+	}
+
+	return absPath, nil
+}
+
 // Name returns the tool name.
 func (t *FileTool) Name() string {
 	return "file"
@@ -64,7 +98,11 @@ func (t *FileTool) readFile(_ context.Context, args map[string]any) (any, error)
 		return "", fmt.Errorf("path argument is required")
 	}
 
-	absPath := filepath.Join(t.workspace, relPath)
+	absPath, err := t.validatePath(relPath)
+	if err != nil {
+		return "", err
+	}
+
 	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
@@ -79,12 +117,15 @@ func (t *FileTool) writeFile(_ context.Context, args map[string]any) (any, error
 		return "", fmt.Errorf("path argument is required")
 	}
 
+	absPath, err := t.validatePath(relPath)
+	if err != nil {
+		return "", err
+	}
+
 	content, ok := args["content"].(string)
 	if !ok {
 		return "", fmt.Errorf("content argument is required")
 	}
-
-	absPath := filepath.Join(t.workspace, relPath)
 
 	// Ensure directory exists
 	dir := filepath.Dir(absPath)
@@ -105,7 +146,10 @@ func (t *FileTool) listDirectory(_ context.Context, args map[string]any) (any, e
 		relPath = "."
 	}
 
-	absPath := filepath.Join(t.workspace, relPath)
+	absPath, err := t.validatePath(relPath)
+	if err != nil {
+		return "", err
+	}
 
 	entries, err := os.ReadDir(absPath)
 	if err != nil {
