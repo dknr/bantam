@@ -34,17 +34,19 @@ func NewOpenAIProvider(apiKey, apiBase, model string) *OpenAIProvider {
 }
 
 // Chat sends a chat completion request to the OpenAI-compatible API.
-  	func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, tools []map[string]any) (*Response, error) {
-  		// Create span for this LLM call
-  		ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.provider_call", map[string]string{
-  			"model":          p.model,
-  			"messages_count": fmt.Sprintf("%d", len(messages)),
-  			"tools_count":    fmt.Sprintf("%d", len(tools)),
-  		})
-  		defer chatSpan.End()
+   	func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, tools []map[string]any) (*Response, error) {
+   		// Create span for this LLM call
+   		ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.provider_call", map[string]string{
+   			"model":          p.model,
+   			"messages_count": fmt.Sprintf("%d", len(messages)),
+   			"tools_count":    fmt.Sprintf("%d", len(tools)),
+   		})
+   		if chatSpan != nil {
+   			defer chatSpan.End()
+   			chatSpan.SetAttributes(attribute.String("llm.model", p.model))
+   		}
 
-  		chatSpan.SetAttributes(attribute.String("llm.model", p.model))
-reqBody := map[string]any{
+ reqBody := map[string]any{
  		"model":    p.model,
  		"messages": messages,
  	}
@@ -72,10 +74,12 @@ reqBody := map[string]any{
 	}
 
 resp, err := p.httpClient.Do(req)
-  	if err != nil {
-  		chatSpan.SetStatus(codes.Error, err.Error())
-  		return nil, fmt.Errorf("HTTP request failed: %w", err)
-  	}
+   	if err != nil {
+   		if chatSpan != nil {
+   			chatSpan.SetStatus(codes.Error, err.Error())
+   		}
+   		return nil, fmt.Errorf("HTTP request failed: %w", err)
+   	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)

@@ -268,15 +268,12 @@ provider:
 
 // Determine system prompt (env var > config > default)
   	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
-  	identitySource := "env var"
   	if systemPrompt == "" {
   		if config.SystemPrompt != "" {
   			systemPrompt = config.SystemPrompt
-  			identitySource = "config"
   		} else {
   			// Hardcoded default - agent will read soul.md from workspace
   			systemPrompt = "Read soul.md from your workspace for your identity and instructions."
-  			identitySource = "default"
   		}
   	}
 
@@ -285,12 +282,15 @@ provider:
 
 // Print startup status (only in interactive mode, not for --prompt)
   	if *prompt == "" {
-  		fmt.Printf("\n\033[90m=== Bantam CLI ===\033[0m\n")
-  		fmt.Printf("Workspace: %s\n", workspace)
-  		fmt.Printf("Session: %s\n", *sessionKey)
-  		fmt.Printf("System prompt source: %s\n", identitySource)
-  		fmt.Printf("Type your message (or /quit to exit)\n\n")
-  	}
+  		// Load session to check if new or existing
+ 		sess := sessions.GetOrCreate(*sessionKey)
+ 		msgCount := len(sess.Messages)
+ 		if msgCount == 0 {
+ 			fmt.Printf("\033[90mWorkspace: %s | Session: %s | New\033[0m\n", workspace, *sessionKey)
+ 		} else {
+ 			fmt.Printf("\033[90mWorkspace: %s | Session: %s | %d messages\033[0m\n", workspace, *sessionKey, msgCount)
+ 		}
+ 	}
 
 // Handle --list-sessions flag
  	if *listSessions {
@@ -317,9 +317,7 @@ provider:
  				os.Exit(1)
  			}
  		}
- 		fmt.Printf("\n\033[90m=== Session Cleared ===\033[0m\n")
- 		fmt.Printf("Session %s cleared.\n", *sessionKey)
- 		fmt.Printf("Type your message (or /quit to exit)\n\n")
+ 		fmt.Printf("\033[90mSession %s cleared. Type your message.\033[0m\n", *sessionKey)
  		os.Exit(0)
  	}
 
@@ -329,9 +327,7 @@ provider:
  			logger.Error(err, "failed to clear sessions")
  			os.Exit(1)
  		}
- 		fmt.Printf("\n\033[90m=== All Sessions Cleared ===\033[0m\n")
- 		fmt.Printf("All sessions cleared. Starting fresh.\n")
- 		fmt.Printf("Type your message (or /quit to exit)\n\n")
+ 		fmt.Printf("\033[90mAll sessions cleared. Type your message.\033[0m\n")
  		os.Exit(0)
  	}
 

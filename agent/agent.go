@@ -63,13 +63,15 @@ func (a *Agent) ProcessMessageWithStats(ctx context.Context, channel, chatID, co
 
 // processMessageWithTiming is the internal implementation that handles both methods.
   	func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, content string) (string, ProcessStats, error) {
- 		// Create span for this message (unified for all sources)
- 		ctx, processSpan := tracing.StartActiveSpan(ctx, "process_message", map[string]string{
- 			"channel":   channel,
- 			"chat_id":   chatID,
- 			"operation": "receive",
- 		})
- 		defer processSpan.End()
+// Create span for this message (unified for all sources)
+  		ctx, processSpan := tracing.StartActiveSpan(ctx, "process_message", map[string]string{
+  			"channel":   channel,
+  			"chat_id":   chatID,
+  			"operation": "receive",
+  		})
+  		if processSpan != nil {
+  			defer processSpan.End()
+  		}
 
 	logger := logging.FromContext(ctx)
 	logger.Info("Processing message", "channel", channel, "chat_id", chatID)
