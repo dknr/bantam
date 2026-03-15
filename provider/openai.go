@@ -1,13 +1,12 @@
 package provider
 
-import (
-  "bytes"
-  "context"
-  "encoding/json"
-  "fmt"
-  "io"
-  "net/http"
-  "time"
+ import (
+   "bytes"
+   "context"
+   "encoding/json"
+   "fmt"
+   "io"
+   "net/http"
 
   "github.com/dknr/bantam/logging"
   "github.com/dknr/bantam/tracing"
@@ -25,12 +24,12 @@ type OpenAIProvider struct {
 
 // NewOpenAIProvider creates a new OpenAI-compatible provider.
 func NewOpenAIProvider(apiKey, apiBase, model string) *OpenAIProvider {
-	return &OpenAIProvider{
-		apiKey:     apiKey,
-		apiBase:    apiBase,
-		model:      model,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
-	}
+return &OpenAIProvider{
+ 		apiKey:     apiKey,
+ 		apiBase:    apiBase,
+ 		model:      model,
+ 		httpClient: &http.Client{},
+ 	}
 }
 
 // Chat sends a chat completion request to the OpenAI-compatible API.
