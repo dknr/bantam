@@ -46,23 +46,24 @@ fmt.Print("> ")
 
 		line = strings.TrimSpace(line)
 
-		// Handle commands
-		if strings.HasPrefix(line, "/") {
-			if strings.EqualFold(line, "/quit") || strings.EqualFold(line, "/exit") {
-				fmt.Println("Goodbye!")
-				return nil
-			}
-			if strings.EqualFold(line, "/clear") {
-				if err := c.sessionMgr.ClearSession(chatID); err != nil {
-					fmt.Printf("Error clearing session: %v\n", err)
-				} else {
-					fmt.Println("Session cleared.")
-				}
-				continue
-			}
-			fmt.Printf("Unknown command: %s\n", line)
-			continue
-		}
+// Handle commands
+ 		if strings.HasPrefix(line, "/") {
+ 			if strings.EqualFold(line, "/quit") || strings.EqualFold(line, "/exit") {
+ 				fmt.Println("Goodbye!")
+ 				return nil
+ 			}
+ 			if strings.EqualFold(line, "/clear") {
+ 				if err := c.sessionMgr.ClearSession(chatID); err != nil {
+ 					fmt.Printf("Error clearing session: %v\n", err)
+ 				} else {
+ 					fmt.Println("Session cleared.")
+ 				}
+ 				fmt.Print("> ")
+ 				continue
+ 			}
+ 			fmt.Printf("Unknown command: %s\n", line)
+ 			continue
+ 		}
 
 		if line == "" {
 			continue
