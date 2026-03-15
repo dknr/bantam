@@ -166,15 +166,14 @@ resp, err := p.httpClient.Do(req)
 	}
 
 llmResponse := NewResponse(content, toolCalls, finishReason)
-  	llmResponse.SetTokens(tokens)
-  	chatSpan.SetAttributes(attribute.Int("llm.token.prompt", tokens["prompt"]))
-  	chatSpan.SetAttributes(attribute.Int("llm.token.completion", tokens["completion"]))
-  	chatSpan.SetAttributes(attribute.Int("llm.token.total", tokens["total"]))
-  	chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(len(toolCalls) > 0)))
-  	chatSpan.SetAttributes(attribute.Int("response.content_length", len(content)))
-  	chatSpan.End()
-  	return llmResponse, nil
-  }
+   	llmResponse.SetTokens(tokens)
+   	chatSpan.SetAttributes(attribute.Int("llm.token.prompt", tokens["prompt"]))
+   	chatSpan.SetAttributes(attribute.Int("llm.token.completion", tokens["completion"]))
+   	chatSpan.SetAttributes(attribute.Int("llm.token.total", tokens["total"]))
+   	chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(len(toolCalls) > 0)))
+   	chatSpan.SetAttributes(attribute.Int("response.content_length", len(content)))
+   	return llmResponse, nil
+   }
 
   // boolToInt converts bool to int for OpenTelemetry attributes.
   func boolToInt(b bool) int {
