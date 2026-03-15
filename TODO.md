@@ -11,6 +11,7 @@
 - OpenTelemetry: OTLP gRPC exporter with no-op when endpoint not configured
 - CLI `/clear` command fixed - Pass session manager to CLI channel, added `ClearSession()` method to Manager
 - System prompt implementation - Add embedded default, config file support, and environment variable override
+- **Structural cleanup** - Moved `main/main.go` → `bantam.go` (root), `main/defaults/` → `defaults/` (root)
 
 ## High Priority
 
