@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dknr/bantam/channel"
 	"github.com/dknr/bantam/logging"
@@ -42,8 +43,11 @@ var runCmd = &cobra.Command{
 		msgCount := sess.MessageCount()
 		channel.PrintStatus(paths.WorkspaceDir, sessionKey, msgCount)
 
+		// Capture terminal width at startup (stdout is still a terminal)
+		termWidth := channel.GetTerminalWidth()
+
 		// Create CLI channel
-		cli := channel.NewCLIChannel(sessions, sessionKey)
+		cli := channel.NewCLIChannelWithWidth(sessions, sessionKey, termWidth)
 
 		// Start CLI channel with handler that processes messages
 		go func() {
@@ -55,7 +59,12 @@ var runCmd = &cobra.Command{
 					return err
 				}
 
-				channel.PrintResponse(response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
+				// Use the channel's RenderMarkdown with cached terminal width
+				fmt.Println(cli.RenderMarkdown(response))
+				// Print stats line in gray
+				fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
+				channel.PrintTokenStats(stats.Tokens, float64(stats.DurationMs), stats.Timing)
+				fmt.Println("\033[0m")
 				return nil
 			})
 

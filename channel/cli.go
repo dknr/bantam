@@ -12,6 +12,7 @@ import (
 	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/provider"
 	"github.com/dknr/bantam/session"
+	"golang.org/x/term"
 )
 
 // CLIChannel implements the Channel interface for terminal input/output.
@@ -19,11 +20,16 @@ type CLIChannel struct {
 	running    bool
 	sessionMgr *session.Manager
 	sessionKey string
+	termWidth  int
 }
 
 // NewCLIChannel creates a new CLI channel.
 func NewCLIChannel(smgr *session.Manager, sessionKey string) *CLIChannel {
-	return &CLIChannel{sessionMgr: smgr, sessionKey: sessionKey}
+	return &CLIChannel{
+		sessionMgr: smgr,
+		sessionKey: sessionKey,
+		termWidth:  getTerminalWidthStatic(),
+	}
 }
 
 // Name returns the channel name.
@@ -297,9 +303,33 @@ const customDarkStyle = `{
 
 // RenderMarkdown renders markdown text with glamour terminal rendering.
 // Returns plain text fallback on error.
-func RenderMarkdown(text string) string {
-	// Get terminal width
-	width := getTerminalWidth()
+// Uses the CLIChannel's cached terminal width if available, otherwise uses static detection.
+func (c *CLIChannel) RenderMarkdown(text string) string {
+	width := c.getTerminalWidthStatic()
+
+	// Create glamour renderer with custom dark style (no margins)
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStylesFromJSONBytes([]byte(customDarkStyle)),
+		glamour.WithWordWrap(width),
+	)
+	if err != nil {
+		return text // fallback to plain text
+	}
+
+	// Render the markdown
+	result, err := r.Render(text)
+	r.Close()
+	if err != nil {
+		return text // fallback to plain text
+	}
+
+	return result
+}
+
+// RenderMarkdownStatic renders markdown text with glamour terminal rendering using static detection.
+// Returns plain text fallback on error.
+func RenderMarkdownStatic(text string) string {
+	width := getTerminalWidthStatic()
 
 	// Create glamour renderer with custom dark style (no margins)
 	r, err := glamour.NewTermRenderer(
@@ -329,10 +359,32 @@ func PrintStatus(workspace, sessionKey string, msgCount int) {
 	}
 }
 
+// PrintTokenStats prints token usage statistics.
+func PrintTokenStats(tokens map[string]int, durationMs float64, timing interface{}) {
+	inputTokens := 0
+	outputTokens := 0
+	if v, ok := tokens["prompt"]; ok {
+		inputTokens = v
+	}
+	if v, ok := tokens["completion"]; ok {
+		outputTokens = v
+	}
+	totalTokens := inputTokens + outputTokens
+
+	if timingStruct, ok := timing.(*provider.Timing); ok {
+		if timingStruct != nil && timingStruct.PromptPerSecond > 0 && timingStruct.PredictedPerSecond > 0 {
+			fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, timingStruct.PromptPerSecond, outputTokens, timingStruct.PredictedPerSecond, totalTokens, durationMs/1000)
+			return
+		}
+	}
+
+	fmt.Printf("%d => %d => %d tokens (%.1fs)", inputTokens, outputTokens, totalTokens, durationMs/1000)
+}
+
 // PrintResponse prints an LLM response with token stats.
 func PrintResponse(response string, tokens map[string]int, durationMs float64, timing interface{}) {
 	// Print markdown-formatted response
-	fmt.Printf("\033[36m%s\033[0m\n", response)
+	fmt.Println(RenderMarkdownStatic(response))
 	// Print stats line in gray
 	fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
 	printTokenStats(tokens, durationMs, timing)
@@ -361,15 +413,50 @@ func printTokenStats(tokens map[string]int, durationMs float64, timing interface
 	fmt.Printf("%d => %d => %d tokens (%.1fs)", inputTokens, outputTokens, totalTokens, durationMs/1000)
 }
 
-// getTerminalWidth attempts to get the terminal width, returns 80 on error.
-func getTerminalWidth() int {
+// getTerminalWidthStatic attempts to get the terminal width, returns 80 on error.
+func (c *CLIChannel) getTerminalWidthStatic() int {
+	if c.termWidth > 0 {
+		return c.termWidth
+	}
+	return getTerminalWidthStatic()
+}
+
+// getTerminalWidthStatic attempts to get the terminal width, returns 80 on error.
+func getTerminalWidthStatic() int {
 	// Try to read environment variables first
 	if w := getEnvWidth("COLUMNS"); w > 0 {
 		return w
 	}
 
+	// Try to get terminal size from stdout
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		width, _, err := term.GetSize(int(os.Stdout.Fd()))
+		if err == nil && width > 0 {
+			return width
+		}
+	}
+
 	// Use a reasonable default
 	return 80
+}
+
+// DebugTerminalWidth returns the detected terminal width (for debugging).
+func DebugTerminalWidth() int {
+	return getTerminalWidthStatic()
+}
+
+// GetTerminalWidth returns the terminal width for the current process.
+func GetTerminalWidth() int {
+	return getTerminalWidthStatic()
+}
+
+// NewCLIChannelWithWidth creates a new CLI channel with the specified terminal width.
+func NewCLIChannelWithWidth(smgr *session.Manager, sessionKey string, termWidth int) *CLIChannel {
+	return &CLIChannel{
+		sessionMgr: smgr,
+		sessionKey: sessionKey,
+		termWidth:  termWidth,
+	}
 }
 
 // getEnvWidth parses an environment variable as an integer width.
