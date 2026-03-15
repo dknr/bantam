@@ -267,37 +267,43 @@ provider:
 	tr.Register(tools.NewEchoTool())
 
 // Determine system prompt (env var > config > default)
- 	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
- 	if systemPrompt == "" && config.SystemPrompt != "" {
- 		systemPrompt = config.SystemPrompt
- 	}
- 	if systemPrompt == "" {
- 		// Read soul.md from workspace for agent identity
- 		soulPath := workspace + "/soul.md"
- 		soulContent, err := os.ReadFile(soulPath)
- 		if err != nil {
- 			// Use default if soul.md not found
- 			soulContent = []byte("You are Bantam, a lightweight AI agent with access to system tools.")
- 		}
- 		systemPrompt = string(soulContent)
- 	}
+  	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
+  	if systemPrompt == "" && config.SystemPrompt != "" {
+  		systemPrompt = config.SystemPrompt
+  	}
+  	// Track which source we're using for status output
+  	identitySource := "env var"
+  	if systemPrompt == "" {
+  		identitySource = "config"
+  	}
+  	if systemPrompt == "" {
+  		// Read soul.md from workspace for agent identity
+  		soulPath := workspace + "/soul.md"
+  		if _, err := os.Stat(soulPath); err == nil {
+  			soulContent, err := os.ReadFile(soulPath)
+  			if err == nil {
+  				systemPrompt = string(soulContent)
+  				identitySource = "soul.md"
+  			}
+  		}
+  		if systemPrompt == "" {
+  			// Use default if soul.md not found or empty
+  			systemPrompt = "You are Bantam, a lightweight AI agent with access to system tools."
+  			identitySource = "embedded default"
+  		}
+  	}
 
 // Create agent
  	ag := agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt)
 
- 	// Print startup status (only in interactive mode, not for --prompt)
- 	if *prompt == "" {
- 		fmt.Printf("\n\033[90m=== Bantam CLI ===\033[0m\n")
- 		fmt.Printf("Workspace: %s\n", workspace)
- 		fmt.Printf("Session: %s\n", *sessionKey)
- 		soulPath := workspace + "/soul.md"
- 		if _, err := os.Stat(soulPath); err == nil {
- 			fmt.Printf("Identity: soul.md loaded\n")
- 		} else {
- 			fmt.Printf("Identity: using default\n")
- 		}
- 		fmt.Printf("Type your message (or /quit to exit)\n\n")
- 	}
+// Print startup status (only in interactive mode, not for --prompt)
+  	if *prompt == "" {
+  		fmt.Printf("\n\033[90m=== Bantam CLI ===\033[0m\n")
+  		fmt.Printf("Workspace: %s\n", workspace)
+  		fmt.Printf("Session: %s\n", *sessionKey)
+  		fmt.Printf("Identity: %s\n", identitySource)
+  		fmt.Printf("Type your message (or /quit to exit)\n\n")
+  	}
 
 // Handle --list-sessions flag
  	if *listSessions {
