@@ -9,7 +9,8 @@
 - Session management: `--session`, `--clear`, `--clear-all`, `--list-sessions` flags
 - Removed bantam binary from git history using git-filter-repo
 - OpenTelemetry: OTLP gRPC exporter with no-op when endpoint not configured
-- **CLI `/clear` command fixed** - Pass session manager to CLI channel, added `ClearSession()` method to Manager
+- CLI `/clear` command fixed - Pass session manager to CLI channel, added `ClearSession()` method to Manager
+- System prompt implementation - Add embedded default, config file support, and environment variable override
 
 ## High Priority
 
@@ -19,16 +20,9 @@
 - User can exit CLI and restart with different session via `--session` flag
 - Add `/session <key>` command if needed in future
 
-### 2. Multi-Session Support in CLI
-**Issue:** CLI uses single chatID ("direct"), can't manage multiple sessions
-**Plan:**
-- Add `/session <key>` command to switch sessions
-- Show current session in prompt
-- `/list-sessions` command in CLI
-
 ## Medium Priority
 
-### 3. Span Attributes for Tracing
+### 2. Span Attributes for Tracing
 **Issue:** Traced operations don't include useful attributes for debugging/analysis
 **Plan:**
 - Add `model` attribute to LLM spans
@@ -36,7 +30,7 @@
 - Add `tools_count` attribute to tool execution spans
 - Add token count attributes (input_tokens, output_tokens)
 
-### 4. Better Tool Schema Management
+### 3. Better Tool Schema Management
 **Issue:** Tool schemas are hardcoded in `DefinitionsWithSchema()`
 **Plan:**
 - Add schema definition methods to Tool interface
@@ -45,13 +39,13 @@
 
 ## Low Priority
 
-### 5. Session Persistence Verification
+### 4. Session Persistence Verification
 **Issue:** Verify `GetOrCreate()` properly loads from disk on restart
 **Plan:**
 - Test session persistence across multiple runs
 - Confirm session key is preserved
 
-### 6. Tool Output Formatting
+### 5. Tool Output Formatting
 **Issue:** Tool results are JSON strings in session, not pretty-printed
 **Plan:**
 - Parse tool results and format for better readability

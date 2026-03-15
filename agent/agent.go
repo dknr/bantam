@@ -20,18 +20,24 @@ import (
 )
 
 // Agent is the core agent instance.
-type Agent struct {
-	provider   provider.Provider
-	toolRegistry *tools.Registry
-	sessionMgr *session.Manager
-}
+ type Agent struct {
+ 	provider     provider.Provider
+ 	toolRegistry *tools.Registry
+ 	sessionMgr   *session.Manager
+ 	systemPrompt string
+ }
 
 // New creates a new Agent instance.
 func New(p provider.Provider, tools *tools.Registry, sessions *session.Manager) *Agent {
+	return NewWithSystemPrompt(p, tools, sessions, "")
+}
+
+func NewWithSystemPrompt(p provider.Provider, tools *tools.Registry, sessions *session.Manager, systemPrompt string) *Agent {
 	return &Agent{
 		provider:     p,
 		toolRegistry: tools,
 		sessionMgr:   sessions,
+		systemPrompt: systemPrompt,
 	}
 }
 
@@ -203,20 +209,29 @@ return responseContent, ProcessStats{DurationMs: int(durationMs), Tokens: tokens
   }
 
 // buildMessages constructs the message history for the LLM.
- 	func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
- 		history := sess.History()
+  	func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
+  		history := sess.History()
 
- 		// Build messages array (simple pass-through for now)
- 		messages := make([]map[string]any, 0, len(history))
- 		for _, msg := range history {
- 			messages = append(messages, map[string]any{
- 				"role":    msg.Role,
- 				"content": msg.Content,
- 			})
- 		}
+  		// Build messages array
+  		messages := make([]map[string]any, 0, len(history)+1)
 
- 		return messages
- 	}
+  		// Prepend system prompt if set
+  		if a.systemPrompt != "" {
+  			messages = append(messages, map[string]any{
+  				"role":    "system",
+  				"content": a.systemPrompt,
+  			})
+  		}
+
+  		for _, msg := range history {
+  			messages = append(messages, map[string]any{
+  				"role":    msg.Role,
+  				"content": msg.Content,
+  			})
+  		}
+
+  		return messages
+  	}
 
  	// boolToInt converts bool to int for OpenTelemetry attributes.
  	func boolToInt(b bool) int {
