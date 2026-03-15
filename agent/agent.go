@@ -155,6 +155,8 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 			if err != nil {
 				logger.Error(err, "tool execution failed", "tool", call.Name)
 				toolSpan.SetStatus(codes.Error, err.Error())
+				// Print error in red to terminal
+				fmt.Printf("\033[91mError: %v\033[0m\n", err)
 				// Add error as tool result so LLM can see what went wrong and potentially retry
 				sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": \"Error: %v\"}", call.Name, err))
 				toolSpan.End()
