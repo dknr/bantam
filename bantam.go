@@ -9,7 +9,6 @@
 //   bantam --clear
 //   bantam --clear-all
 //   bantam --list-sessions
-//   bantam --init-config
 //   bantam --init
 //
 // Flags:
@@ -19,8 +18,7 @@
 //   --clear         Clear default session (cli:direct) and exit
 //   --clear-all     Clear all sessions and exit
 //   --list-sessions List all sessions and exit
-//   --init-config   Write default config file and exit
-//   --init          Initialize workspace (config + soul.md) and exit
+//   --init          Initialize base directory, workspace, and soul.md and exit
 package main
 
 import (
@@ -70,30 +68,27 @@ func main() {
 	listSessions := flag.Bool("list-sessions", false, "List all sessions and exit")
 	clear := flag.Bool("clear", false, "Clear default session (cli:direct) and exit")
 	clearAll := flag.Bool("clear-all", false, "Clear all sessions and exit")
-	initConfig := flag.Bool("init-config", false, "Write default config file and exit")
-	initWorkspace := flag.Bool("init", false, "Initialize workspace (config + soul.md) and exit")
+	initWorkspace := flag.Bool("init", false, "Initialize base directory, workspace, and soul.md and exit")
 	flag.Parse()
 
 // Handle --init flag first (before any other logic)
- 	if *initWorkspace {
- 		workspace := os.Getenv("BANTAM_WORKSPACE")
- 		if workspace == "" {
- 			workspace = os.Getenv("HOME") + "/.bantam"
- 		}
+if *initWorkspace {
+		workspace := os.Getenv("BANTAM_WORKSPACE")
+		if workspace == "" {
+			workspace = os.Getenv("HOME") + "/.bantam/workspace"
+		}
 
- 		if *prompt != "" || *clear {
- 			fmt.Fprintln(os.Stderr, "Error: --init cannot be combined with other operations")
- 			os.Exit(1)
- 		}
-
- 		configPath := workspace + "/config.yaml"
- 		soulPath := workspace + "/soul.md"
- 		if _, err := os.Stat(configPath); err == nil {
- 			fmt.Fprintf(os.Stderr, "Error: Config file already exists at %s\n", configPath)
+		if *prompt != "" || *clear {
+			fmt.Fprintln(os.Stderr, "Error: --init cannot be combined with other operations")
 			os.Exit(1)
 		}
-		if _, err := os.Stat(soulPath); err == nil {
-			fmt.Fprintf(os.Stderr, "Error: soul.md already exists at %s\n", soulPath)
+
+		baseDir := os.Getenv("HOME") + "/.bantam"
+		configPath := baseDir + "/config.yaml"
+		soulPath := workspace + "/soul.md"
+
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Failed to create base directory: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -123,58 +118,22 @@ provider:
 			os.Exit(1)
 		}
 
-		fmt.Printf("Workspace initialized at %s\n", workspace)
-		fmt.Printf("  - config.yaml: Default configuration\n")
-		fmt.Printf("  - soul.md: Agent identity and instructions\n")
-		os.Exit(0)
+fmt.Printf("Base directory: %s\n", baseDir)
+ 		fmt.Printf("  - config.yaml: Default configuration\n")
+ 		fmt.Printf("Workspace: %s\n", workspace)
+ 		fmt.Printf("  - soul.md: Agent identity and instructions\n")
+	os.Exit(0)
 	}
 
-	// Handle --init-config flag (legacy, config only)
-	if *initConfig {
-		workspace := os.Getenv("HOME") + "/.bantam"
-
-		if *prompt != "" || *clear {
-			fmt.Fprintln(os.Stderr, "Error: --init-config cannot be combined with other operations")
-			os.Exit(1)
-		}
-
-		configPath := workspace + "/config.yaml"
-		if _, err := os.Stat(configPath); err == nil {
-			fmt.Fprintf(os.Stderr, "Error: Config file already exists at %s\n", configPath)
-			os.Exit(1)
-		}
-
-		if err := os.MkdirAll(workspace, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to create workspace: %v\n", err)
-			os.Exit(1)
-		}
-
-		configContent := `workspace: ` + workspace + `
-tracing:
-  endpoint: ""
-  serviceName: bantam
-provider:
-  apiKey: ""
-  apiBase: http://localhost:11434/v1
-  model: gpt-oss-20b
-`
-		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to write config: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("Default config written to %s\n", configPath)
-		os.Exit(0)
-	}
+	// Get base directory for config/logs/sessions
+	baseDir := os.Getenv("HOME") + "/.bantam"
+	configPath := baseDir + "/config.yaml"
 
 	// Get workspace from environment or use default
 	workspace := os.Getenv("BANTAM_WORKSPACE")
 	if workspace == "" {
-		workspace = os.Getenv("HOME") + "/.bantam"
+		workspace = os.Getenv("HOME") + "/.bantam/workspace"
 	}
-
-	// Load config file if it exists
-	configPath := workspace + "/config.yaml"
 	var config Config
 	if _, err := os.Stat(configPath); err == nil {
 		configData, err := os.ReadFile(configPath)
@@ -209,16 +168,16 @@ provider:
 		}
 	}
 
-// Setup logging with logs directory
- 	logsDir := workspace + "/logs"
- 	logger := logging.NewLogger(logsDir, *verbose)
- 	ctx := logging.NewContextWithLogger(context.Background(), logger)
+logsDir := baseDir + "/logs"
+	logger := logging.NewLogger(logsDir, *verbose)
+	ctx := logging.NewContextWithLogger(context.Background(), logger)
  	ctx = logging.SetVerbose(ctx, *verbose)
 
- 	// Change to workspace directory so agent doesn't get lost
- 	if err := os.Chdir(workspace); err != nil {
- 		logger.Error(err, "failed to change to workspace directory", "workspace", workspace)
- 	}
+// Change to workspace directory so agent doesn't get lost
+  	if err := os.Chdir(workspace); err != nil {
+  		logger.Error(err, "failed to change to workspace directory", "workspace", workspace)
+  		os.Exit(1)
+  	}
 
 	// Setup OpenTelemetry
 	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -257,7 +216,7 @@ provider:
 	p := provider.NewOpenAIProvider(apiKey, apiBase, model)
 
 	// Create session manager
-	sessions := session.NewManager(workspace)
+	sessions := session.NewManager(baseDir, workspace)
 
 	// Create tool registry
 	tr := tools.NewRegistry()
