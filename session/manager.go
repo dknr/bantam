@@ -176,3 +176,20 @@ func (m *Manager) Clear() error {
 	// Recreate directory for future sessions
 	return os.MkdirAll(sessionDir, 0755)
 }
+
+// ClearSession removes a specific session from memory and disk.
+func (m *Manager) ClearSession(key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Remove from memory
+	delete(m.sessions, key)
+
+	// Remove from disk
+	path := m.sessionPath(key)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}

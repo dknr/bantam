@@ -9,77 +9,49 @@
 - Session management: `--session`, `--clear`, `--clear-all`, `--list-sessions` flags
 - Removed bantam binary from git history using git-filter-repo
 - OpenTelemetry: OTLP gRPC exporter with no-op when endpoint not configured
+- **CLI `/clear` command fixed** - Pass session manager to CLI channel, added `ClearSession()` method to Manager
 
-## Pending
-- Add span attributes to tracked operations (model, messages_count, tools_count, tokens)
-- Add `otlp/otlphttp` exporter option for HTTP transportelemetry tracing with console exporter
+## High Priority
 
-## Pending Work
-
-### 0. Remove bantam binary from git history
-**Priority:** Medium
-**Issue:** Build artifact committed to repo
+### 1. Multi-Session Support in CLI
+**Issue:** CLI uses single chatID ("direct"), can't manage multiple sessions
 **Plan:**
-1. Clone clean repo from remote
-2. Install git-filter-repo (done via pip3)
-3. Use `git filter-repo --path bantam --invert-paths` to remove binary
-4. Force push to remote
-5. Add `bantam` to `.gitignore` in new repo clone
+- User can exit CLI and restart with different session via `--session` flag
+- Add `/session <key>` command if needed in future
 
-### 1. OpenTelemetry Console Exporter Not Showing Spans
-**Issue:** Console exporter is configured but spans aren't visible in terminal output
-**Plan:**
-- Verify stdouttrace exporter configuration
-- Check if ForceFlush is being called after each span
-- Test with `OTEL_EXPORTER_OTLP_ENDPOINT=console` or similar
-
-### 2. Context Window Management
-**Priority:** High
-**Issue:** No limit on conversation history size
-**Plan:**
-- Add config option for max history size
-- Implement sliding window (remove oldest messages)
-- Consider token-based truncation
-
-### 2. CLI `/clear` Command
-**Priority:** Medium
-**Issue:** `/clear` command in CLI prints a message but doesn't actually clear the session
-**Plan:**
-- Update CLI channel to call `sessionMgr.ClearSession()` or reset session
-- Need to track current session key in CLI channel
-
-### 3. Multi-Session Support in CLI
-**Priority:** Medium
+### 2. Multi-Session Support in CLI
 **Issue:** CLI uses single chatID ("direct"), can't manage multiple sessions
 **Plan:**
 - Add `/session <key>` command to switch sessions
 - Show current session in prompt
 - `/list-sessions` command in CLI
 
+## Medium Priority
+
+### 3. Span Attributes for Tracing
+**Issue:** Traced operations don't include useful attributes for debugging/analysis
+**Plan:**
+- Add `model` attribute to LLM spans
+- Add `messages_count` attribute to process_message span
+- Add `tools_count` attribute to tool execution spans
+- Add token count attributes (input_tokens, output_tokens)
+
 ### 4. Better Tool Schema Management
-**Priority:** Medium
 **Issue:** Tool schemas are hardcoded in `DefinitionsWithSchema()`
 **Plan:**
 - Add schema definition methods to Tool interface
 - Auto-generate schemas from tool parameters
 - Support optional vs required parameters
 
+## Low Priority
+
 ### 5. Session Persistence Verification
-**Priority:** Low
 **Issue:** Verify `GetOrCreate()` properly loads from disk on restart
 **Plan:**
 - Test session persistence across multiple runs
 - Confirm session key is preserved
 
-### 6. OpenTelemetry Implementation
-**Priority:** Low
-**Issue:** OTEL is a placeholder - returns nil
-**Plan:**
-- Research OpenTelemetry Go SDK compatibility
-- Implement actual tracing spans
-
-### 7. Tool Output Formatting
-**Priority:** Low
+### 6. Tool Output Formatting
 **Issue:** Tool results are JSON strings in session, not pretty-printed
 **Plan:**
 - Parse tool results and format for better readability

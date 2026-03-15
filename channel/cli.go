@@ -8,16 +8,18 @@ import (
 	"strings"
 
 	"github.com/dknr/bantam/logging"
+	"github.com/dknr/bantam/session"
 )
 
 // CLIChannel implements the Channel interface for terminal input/output.
 type CLIChannel struct {
-	running bool
+	running    bool
+	sessionMgr *session.Manager
 }
 
 // NewCLIChannel creates a new CLI channel.
-func NewCLIChannel() *CLIChannel {
-	return &CLIChannel{}
+func NewCLIChannel(smgr *session.Manager) *CLIChannel {
+	return &CLIChannel{sessionMgr: smgr}
 }
 
 // Name returns the channel name.
@@ -52,7 +54,11 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 				return nil
 			}
 			if strings.EqualFold(line, "/clear") {
-				fmt.Println("Clearing session...")
+				if err := c.sessionMgr.ClearSession(chatID); err != nil {
+					fmt.Printf("Error clearing session: %v\n", err)
+				} else {
+					fmt.Println("Session cleared.")
+				}
 				continue
 			}
 			fmt.Printf("Unknown command: %s\n", line)

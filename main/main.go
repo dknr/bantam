@@ -263,7 +263,7 @@ if err != nil {
 	}
 
 	// Create CLI channel
-	cli := channel.NewCLIChannel()
+	cli := channel.NewCLIChannel(sessions)
 
 	// Create a context that can be cancelled for graceful shutdown
 	ctx, cancel := context.WithCancel(ctx)
