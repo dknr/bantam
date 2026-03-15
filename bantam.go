@@ -366,12 +366,10 @@ provider:
 				return err
 			}
 
-			// Print response with header
-			printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs))
+// Print response with header
+ 			printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs))
 
-			// Print prompt once
-			fmt.Print("> ")
-			return nil
+ 			return nil
 		})
 
 		if err != nil {
