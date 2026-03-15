@@ -125,11 +125,11 @@ func Since(t time.Time) int {
 }
 
 // PrintJSON prints pretty-printed JSON to stderr with the given label.
- 	func PrintJSON(label string, data any) {
- 		jsonBytes, err := json.MarshalIndent(data, "", "  ")
- 		if err != nil {
- 			// Fallback to single line if marshaling fails
- 			jsonBytes, _ = json.Marshal(data)
- 		}
- 		fmt.Fprintf(os.Stderr, "\n%s:\n%s\n\n", label, string(jsonBytes))
- 	}
+func PrintJSON(label string, data any) {
+	jsonBytes, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		// Fallback to single line if marshaling fails
+		jsonBytes, _ = json.Marshal(data)
+	}
+	fmt.Fprintf(os.Stderr, "\n%s:\n%s\n\n", label, string(jsonBytes))
+}

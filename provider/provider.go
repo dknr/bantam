@@ -7,27 +7,27 @@ import (
 
 // ToolCall represents a tool call request from the LLM.
 type ToolCall struct {
-	ID       string
-	Name     string
+	ID        string
+	Name      string
 	Arguments map[string]any
 }
 
 // Timing represents token generation timing from the LLM API.
- type Timing struct {
- 	PromptMs          float64
- 	PromptPerSecond   float64
- 	PredictedMs       float64
- 	PredictedPerSecond float64
- }
+type Timing struct {
+	PromptMs           float64
+	PromptPerSecond    float64
+	PredictedMs        float64
+	PredictedPerSecond float64
+}
 
- // Response is the result from an LLM call.
- type Response struct {
- 	content      string
- 	toolCalls    []ToolCall
- 	finishReason string
- 	tokens       map[string]int
- 	timing       *Timing
- }
+// Response is the result from an LLM call.
+type Response struct {
+	content      string
+	toolCalls    []ToolCall
+	finishReason string
+	tokens       map[string]int
+	timing       *Timing
+}
 
 // NewResponse creates a new Response.
 func NewResponse(content string, toolCalls []ToolCall, finishReason string) *Response {
@@ -40,19 +40,19 @@ func NewResponse(content string, toolCalls []ToolCall, finishReason string) *Res
 }
 
 // SetTokens sets the token usage information.
- func (r *Response) SetTokens(tokens map[string]int) {
- 	r.tokens = tokens
- }
+func (r *Response) SetTokens(tokens map[string]int) {
+	r.tokens = tokens
+}
 
- // SetTiming sets the timing information.
- func (r *Response) SetTiming(timing *Timing) {
- 	r.timing = timing
- }
+// SetTiming sets the timing information.
+func (r *Response) SetTiming(timing *Timing) {
+	r.timing = timing
+}
 
- // Timing returns the timing information.
- func (r *Response) Timing() *Timing {
- 	return r.timing
- }
+// Timing returns the timing information.
+func (r *Response) Timing() *Timing {
+	return r.timing
+}
 
 // TokenCount returns the total token count.
 func (r *Response) TokenCount() int {

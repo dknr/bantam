@@ -6,15 +6,15 @@ import (
 )
 
 // Tool is an interface for agent tools.
- type Tool interface {
- 	Name() string
- 	Execute(ctx context.Context, args map[string]any) (any, error)
- }
+type Tool interface {
+	Name() string
+	Execute(ctx context.Context, args map[string]any) (any, error)
+}
 
- // StatusLineTool is an optional interface for tools that can provide a status line.
- type StatusLineTool interface {
- 	StatusLine(args map[string]any) string
- }
+// StatusLineTool is an optional interface for tools that can provide a status line.
+type StatusLineTool interface {
+	StatusLine(args map[string]any) string
+}
 
 // Registry holds available tools.
 type Registry struct {
@@ -49,67 +49,67 @@ func (r *Registry) Execute(ctx context.Context, name string, args map[string]any
 }
 
 // Definitions returns OpenAI-style tool definitions.
- 	func (r *Registry) Definitions() []map[string]any {
- 		defs := make([]map[string]any, 0, len(r.tools))
- 		for _, tool := range r.tools {
- 			defs = append(defs, map[string]any{
- 				"type": "function",
- 				"function": map[string]any{
- 					"name":        tool.Name(),
- 					"description": "Tool implementation",
- 					"parameters": map[string]any{
- 						"type":       "object",
- 						"properties": map[string]any{},
- 					},
- 				},
- 			})
- 		}
- 		return defs
- 	}
+func (r *Registry) Definitions() []map[string]any {
+	defs := make([]map[string]any, 0, len(r.tools))
+	for _, tool := range r.tools {
+		defs = append(defs, map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name":        tool.Name(),
+				"description": "Tool implementation",
+				"parameters": map[string]any{
+					"type":       "object",
+					"properties": map[string]any{},
+				},
+			},
+		})
+	}
+	return defs
+}
 
 // DefinitionsWithSchema returns OpenAI-style tool definitions with parameter schemas.
-  func (r *Registry) DefinitionsWithSchema() []map[string]any {
-  	defs := make([]map[string]any, 0, len(r.tools))
-  	for _, tool := range r.tools {
-  		schema := map[string]any{
-  			"type":       "object",
-  			"properties": map[string]any{},
-  		}
+func (r *Registry) DefinitionsWithSchema() []map[string]any {
+	defs := make([]map[string]any, 0, len(r.tools))
+	for _, tool := range r.tools {
+		schema := map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		}
 
-  		// Add specific parameter schemas for known tools
-  		switch tool.Name() {
-  		case "echo":
-  			schema["properties"].(map[string]any)["message"] = map[string]any{
-  				"type":        "string",
-  				"description": "The message to echo back",
-  			}
-  			schema["required"] = []string{"message"}
-  		case "shell":
-  			schema["properties"].(map[string]any)["command"] = map[string]any{
-  				"type":        "string",
-  				"description": "The shell command to execute",
-  			}
-  			schema["required"] = []string{"command"}
-  		case "filesystem":
-  			schema["properties"].(map[string]any)["operation"] = map[string]any{
-  				"type":        "string",
-  				"description": "The operation to perform: read, write, or list",
-  			}
-  			schema["properties"].(map[string]any)["path"] = map[string]any{
-  				"type":        "string",
-  				"description": "The file or directory path",
-  			}
-  			schema["required"] = []string{"operation", "path"}
-  		}
+		// Add specific parameter schemas for known tools
+		switch tool.Name() {
+		case "echo":
+			schema["properties"].(map[string]any)["message"] = map[string]any{
+				"type":        "string",
+				"description": "The message to echo back",
+			}
+			schema["required"] = []string{"message"}
+		case "shell":
+			schema["properties"].(map[string]any)["command"] = map[string]any{
+				"type":        "string",
+				"description": "The shell command to execute",
+			}
+			schema["required"] = []string{"command"}
+		case "filesystem":
+			schema["properties"].(map[string]any)["operation"] = map[string]any{
+				"type":        "string",
+				"description": "The operation to perform: read, write, or list",
+			}
+			schema["properties"].(map[string]any)["path"] = map[string]any{
+				"type":        "string",
+				"description": "The file or directory path",
+			}
+			schema["required"] = []string{"operation", "path"}
+		}
 
- 		defs = append(defs, map[string]any{
- 			"type": "function",
- 			"function": map[string]any{
- 				"name":        tool.Name(),
- 				"description": "Tool implementation",
- 				"parameters":  schema,
- 			},
- 		})
- 	}
- 	return defs
- }
+		defs = append(defs, map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name":        tool.Name(),
+				"description": "Tool implementation",
+				"parameters":  schema,
+			},
+		})
+	}
+	return defs
+}

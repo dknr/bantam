@@ -3,22 +3,24 @@
 // Bantam is a lightweight agent with unified message routing.
 //
 // Usage:
-//   bantam [--verbose]
-//   bantam --prompt "your message"
-//   bantam --session "channel:id"
-//   bantam --clear
-//   bantam --clear-all
-//   bantam --list-sessions
-//   bantam --init
+//
+//	bantam [--verbose]
+//	bantam --prompt "your message"
+//	bantam --session "channel:id"
+//	bantam --clear
+//	bantam --clear-all
+//	bantam --list-sessions
+//	bantam --init
 //
 // Flags:
-//   --verbose       Enable verbose console logging
-//   --prompt        Send a single message and exit
-//   --session       Session key to use (default: cli:direct)
-//   --clear         Clear default session (cli:direct) and exit
-//   --clear-all     Clear all sessions and exit
-//   --list-sessions List all sessions and exit
-//   --init          Initialize base directory, workspace, and soul.md and exit
+//
+//	--verbose       Enable verbose console logging
+//	--prompt        Send a single message and exit
+//	--session       Session key to use (default: cli:direct)
+//	--clear         Clear default session (cli:direct) and exit
+//	--clear-all     Clear all sessions and exit
+//	--list-sessions List all sessions and exit
+//	--init          Initialize base directory, workspace, and soul.md and exit
 package main
 
 import (
@@ -47,9 +49,9 @@ var defaultSoul string
 
 // Config represents the bantam configuration
 type Config struct {
-	Workspace      string `yaml:"workspace"`
-	SystemPrompt   string `yaml:"systemPrompt,omitempty"`
-	Tracing        struct {
+	Workspace    string `yaml:"workspace"`
+	SystemPrompt string `yaml:"systemPrompt,omitempty"`
+	Tracing      struct {
 		Endpoint    string `yaml:"endpoint"`
 		ServiceName string `yaml:"serviceName"`
 	} `yaml:"tracing"`
@@ -71,8 +73,8 @@ func main() {
 	initWorkspace := flag.Bool("init", false, "Initialize base directory, workspace, and soul.md and exit")
 	flag.Parse()
 
-// Handle --init flag first (before any other logic)
-if *initWorkspace {
+	// Handle --init flag first (before any other logic)
+	if *initWorkspace {
 		workspace := os.Getenv("BANTAM_WORKSPACE")
 		if workspace == "" {
 			workspace = os.Getenv("HOME") + "/.bantam/workspace"
@@ -118,11 +120,11 @@ provider:
 			os.Exit(1)
 		}
 
-fmt.Printf("Base directory: %s\n", baseDir)
- 		fmt.Printf("  - config.yaml: Default configuration\n")
- 		fmt.Printf("Workspace: %s\n", workspace)
- 		fmt.Printf("  - soul.md: Agent identity and instructions\n")
-	os.Exit(0)
+		fmt.Printf("Base directory: %s\n", baseDir)
+		fmt.Printf("  - config.yaml: Default configuration\n")
+		fmt.Printf("Workspace: %s\n", workspace)
+		fmt.Printf("  - soul.md: Agent identity and instructions\n")
+		os.Exit(0)
 	}
 
 	// Get base directory for config/logs/sessions
@@ -168,16 +170,16 @@ fmt.Printf("Base directory: %s\n", baseDir)
 		}
 	}
 
-logsDir := baseDir + "/logs"
+	logsDir := baseDir + "/logs"
 	logger := logging.NewLogger(logsDir, *verbose)
 	ctx := logging.NewContextWithLogger(context.Background(), logger)
- 	ctx = logging.SetVerbose(ctx, *verbose)
+	ctx = logging.SetVerbose(ctx, *verbose)
 
-// Change to workspace directory so agent doesn't get lost
-  	if err := os.Chdir(workspace); err != nil {
-  		logger.Error(err, "failed to change to workspace directory", "workspace", workspace)
-  		os.Exit(1)
-  	}
+	// Change to workspace directory so agent doesn't get lost
+	if err := os.Chdir(workspace); err != nil {
+		logger.Error(err, "failed to change to workspace directory", "workspace", workspace)
+		os.Exit(1)
+	}
 
 	// Setup OpenTelemetry
 	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -225,70 +227,70 @@ logsDir := baseDir + "/logs"
 	tr.Register(tools.NewTimeTool())
 	tr.Register(tools.NewEchoTool())
 
-// Determine system prompt (env var > config > default)
-  	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
-  	if systemPrompt == "" {
-  		if config.SystemPrompt != "" {
-  			systemPrompt = config.SystemPrompt
-  		} else {
-  			// Hardcoded default - agent will read soul.md from workspace
-  			systemPrompt = "Read soul.md from your workspace for your identity and instructions."
-  		}
-  	}
+	// Determine system prompt (env var > config > default)
+	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
+	if systemPrompt == "" {
+		if config.SystemPrompt != "" {
+			systemPrompt = config.SystemPrompt
+		} else {
+			// Hardcoded default - agent will read soul.md from workspace
+			systemPrompt = "Read soul.md from your workspace for your identity and instructions."
+		}
+	}
 
-// Create agent
- 	ag := agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt)
+	// Create agent
+	ag := agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt)
 
-// Print startup status (only in interactive mode, not for --prompt)
-   	if *prompt == "" {
-   		// Load session to check if new or existing
-  		sess := sessions.GetOrCreate(*sessionKey)
-  		msgCount := sess.MessageCount()
-  		if msgCount == 0 {
-  			fmt.Printf("\033[90mWorkspace: %s | Session: %s | New\033[0m\n", workspace, *sessionKey)
-  		} else {
-  			fmt.Printf("\033[90mWorkspace: %s | Session: %s | %d messages\033[0m\n", workspace, *sessionKey, msgCount)
-  		}
-  	}
+	// Print startup status (only in interactive mode, not for --prompt)
+	if *prompt == "" {
+		// Load session to check if new or existing
+		sess := sessions.GetOrCreate(*sessionKey)
+		msgCount := sess.MessageCount()
+		if msgCount == 0 {
+			fmt.Printf("\033[90mWorkspace: %s | Session: %s | New\033[0m\n", workspace, *sessionKey)
+		} else {
+			fmt.Printf("\033[90mWorkspace: %s | Session: %s | %d messages\033[0m\n", workspace, *sessionKey, msgCount)
+		}
+	}
 
-// Handle --list-sessions flag
- 	if *listSessions {
- 		sessionsList := sessions.ListSessions()
- 		if len(sessionsList) == 0 {
- 			fmt.Println("No sessions found.")
- 		} else {
- 			fmt.Println("Sessions:")
- 			for _, s := range sessionsList {
- 				fmt.Printf("  - %s\n", s)
- 			}
- 		}
- 		os.Exit(0)
- 	}
+	// Handle --list-sessions flag
+	if *listSessions {
+		sessionsList := sessions.ListSessions()
+		if len(sessionsList) == 0 {
+			fmt.Println("No sessions found.")
+		} else {
+			fmt.Println("Sessions:")
+			for _, s := range sessionsList {
+				fmt.Printf("  - %s\n", s)
+			}
+		}
+		os.Exit(0)
+	}
 
-// Handle --clear flag (clear default session only)
-  	if *clear {
-  		sessionPath := sessions.SessionPath(*sessionKey)
- 		if err := os.Remove(sessionPath); err != nil {
- 			if os.IsNotExist(err) {
- 				fmt.Printf("Session %s does not exist.\n", *sessionKey)
- 			} else {
- 				logger.Error(err, "failed to clear session", "session", *sessionKey)
- 				os.Exit(1)
- 			}
- 		}
- 		fmt.Printf("\033[90mSession %s cleared. Type your message.\033[0m\n", *sessionKey)
- 		os.Exit(0)
- 	}
+	// Handle --clear flag (clear default session only)
+	if *clear {
+		sessionPath := sessions.SessionPath(*sessionKey)
+		if err := os.Remove(sessionPath); err != nil {
+			if os.IsNotExist(err) {
+				fmt.Printf("Session %s does not exist.\n", *sessionKey)
+			} else {
+				logger.Error(err, "failed to clear session", "session", *sessionKey)
+				os.Exit(1)
+			}
+		}
+		fmt.Printf("\033[90mSession %s cleared. Type your message.\033[0m\n", *sessionKey)
+		os.Exit(0)
+	}
 
-// Handle --clear-all flag
- 	if *clearAll {
- 		if err := sessions.Clear(); err != nil {
- 			logger.Error(err, "failed to clear sessions")
- 			os.Exit(1)
- 		}
- 		fmt.Printf("\033[90mAll sessions cleared. Type your message.\033[0m\n")
- 		os.Exit(0)
- 	}
+	// Handle --clear-all flag
+	if *clearAll {
+		if err := sessions.Clear(); err != nil {
+			logger.Error(err, "failed to clear sessions")
+			os.Exit(1)
+		}
+		fmt.Printf("\033[90mAll sessions cleared. Type your message.\033[0m\n")
+		os.Exit(0)
+	}
 
 	// Handle --prompt flag (one-shot mode)
 	if *prompt != "" {
@@ -304,13 +306,13 @@ logsDir := baseDir + "/logs"
 			os.Exit(1)
 		}
 
-// Print response with header
- 		printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
- 		os.Exit(0)
- 	}
+		// Print response with header
+		printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
+		os.Exit(0)
+	}
 
-// Create CLI channel
-  	cli := channel.NewCLIChannel(sessions, *sessionKey)
+	// Create CLI channel
+	cli := channel.NewCLIChannel(sessions, *sessionKey)
 
 	// Create a context that can be cancelled for graceful shutdown
 	ctx, cancel := context.WithCancel(ctx)
@@ -320,22 +322,22 @@ logsDir := baseDir + "/logs"
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-// Start CLI channel
-  	go func() {
- 		err := cli.Start(ctx, func(ctx context.Context, sessionKey, chatID, content string) error {
- 			// Process message through unified agent loop
- 			logger := logging.FromContext(ctx)
- 			response, stats, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
+	// Start CLI channel
+	go func() {
+		err := cli.Start(ctx, func(ctx context.Context, sessionKey, chatID, content string) error {
+			// Process message through unified agent loop
+			logger := logging.FromContext(ctx)
+			response, stats, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
 			if err != nil {
 				logger.Error(err, "failed to process message")
 				fmt.Printf("\033[31mError: %v\033[0m\n\n", err)
 				return err
 			}
 
-// Print response with header
-  			printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
+			// Print response with header
+			printResponse(ctx, response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
 
- 			return nil
+			return nil
 		})
 
 		if err != nil {
@@ -343,50 +345,50 @@ logsDir := baseDir + "/logs"
 		}
 	}()
 
-// Wait for shutdown signal
- 	<-sigChan
- 	fmt.Println("\nShutting down...")
+	// Wait for shutdown signal
+	<-sigChan
+	fmt.Println("\nShutting down...")
 
- 	// Cancel context to stop the CLI loop
- 	cancel()
+	// Cancel context to stop the CLI loop
+	cancel()
 
- 	// Cleanup
- 	if err := cli.Stop(); err != nil {
- 		logger.Error(err, "failed to stop channel")
- 	}
- 	if err := tracing.ShutdownOTEL(); err != nil {
- 		logger.Error(err, "failed to shutdown OpenTelemetry")
- 	}
- }
+	// Cleanup
+	if err := cli.Stop(); err != nil {
+		logger.Error(err, "failed to stop channel")
+	}
+	if err := tracing.ShutdownOTEL(); err != nil {
+		logger.Error(err, "failed to shutdown OpenTelemetry")
+	}
+}
 
 // printResponse prints the LLM response with stats at the bottom
-    func printResponse(ctx context.Context, response string, tokens map[string]int, durationMs float64, timing interface{}) {
-    	fmt.Printf("\033[36m%s\033[0m\n", response)
-    	fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
-    	printTokenStats(tokens, durationMs, timing)
-    	fmt.Println("\033[0m")
-    }
+func printResponse(ctx context.Context, response string, tokens map[string]int, durationMs float64, timing interface{}) {
+	fmt.Printf("\033[36m%s\033[0m\n", response)
+	fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
+	printTokenStats(tokens, durationMs, timing)
+	fmt.Println("\033[0m")
+}
 
 // printTokenStats prints token usage statistics with provider timing data
-    func printTokenStats(tokens map[string]int, durationMs float64, timing interface{}) {
-    	inputTokens := 0
-    	outputTokens := 0
-    	if v, ok := tokens["prompt"]; ok {
-    		inputTokens = v
-    	}
-    	if v, ok := tokens["completion"]; ok {
-    		outputTokens = v
-    	}
-    	totalTokens := inputTokens + outputTokens
+func printTokenStats(tokens map[string]int, durationMs float64, timing interface{}) {
+	inputTokens := 0
+	outputTokens := 0
+	if v, ok := tokens["prompt"]; ok {
+		inputTokens = v
+	}
+	if v, ok := tokens["completion"]; ok {
+		outputTokens = v
+	}
+	totalTokens := inputTokens + outputTokens
 
-    	// Use provider timing data if available (Timing struct)
-    	if timingStruct, ok := timing.(*provider.Timing); ok {
-    		if timingStruct != nil && timingStruct.PromptPerSecond > 0 && timingStruct.PredictedPerSecond > 0 {
-    			fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, timingStruct.PromptPerSecond, outputTokens, timingStruct.PredictedPerSecond, totalTokens, durationMs/1000)
-    			return
-    		}
-    	}
+	// Use provider timing data if available (Timing struct)
+	if timingStruct, ok := timing.(*provider.Timing); ok {
+		if timingStruct != nil && timingStruct.PromptPerSecond > 0 && timingStruct.PredictedPerSecond > 0 {
+			fmt.Printf("%d (%.1f/s) => %d (%.1f/s) => %d (%.1fs)", inputTokens, timingStruct.PromptPerSecond, outputTokens, timingStruct.PredictedPerSecond, totalTokens, durationMs/1000)
+			return
+		}
+	}
 
-    	// Provider didn't provide timing, just show token counts
-    	fmt.Printf("%d => %d => %d tokens (%.1fs)", inputTokens, outputTokens, totalTokens, durationMs/1000)
-    }
+	// Provider didn't provide timing, just show token counts
+	fmt.Printf("%d => %d => %d tokens (%.1fs)", inputTokens, outputTokens, totalTokens, durationMs/1000)
+}

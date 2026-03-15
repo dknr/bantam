@@ -12,16 +12,16 @@ import (
 )
 
 // CLIChannel implements the Channel interface for terminal input/output.
- type CLIChannel struct {
- 	running    bool
- 	sessionMgr *session.Manager
- 	sessionKey string
- }
+type CLIChannel struct {
+	running    bool
+	sessionMgr *session.Manager
+	sessionKey string
+}
 
 // NewCLIChannel creates a new CLI channel.
- func NewCLIChannel(smgr *session.Manager, sessionKey string) *CLIChannel {
- 	return &CLIChannel{sessionMgr: smgr, sessionKey: sessionKey}
- }
+func NewCLIChannel(smgr *session.Manager, sessionKey string) *CLIChannel {
+	return &CLIChannel{sessionMgr: smgr, sessionKey: sessionKey}
+}
 
 // Name returns the channel name.
 func (c *CLIChannel) Name() string {
@@ -29,19 +29,19 @@ func (c *CLIChannel) Name() string {
 }
 
 // Start begins receiving messages from stdin.
-   func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context, sessionKey, chatID, content string) error) error {
-   	c.running = true
-   	logger := logging.FromContext(ctx)
-   
-   	reader := bufio.NewReader(os.Stdin)
-   	// Extract session key parts
-   	sessionKey := c.sessionKey
-   	chatID := sessionKey
-   	if idx := strings.Index(chatID, ":"); idx != -1 {
-   		chatID = chatID[idx+1:]
-   	}
+func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context, sessionKey, chatID, content string) error) error {
+	c.running = true
+	logger := logging.FromContext(ctx)
 
-fmt.Print("> ")
+	reader := bufio.NewReader(os.Stdin)
+	// Extract session key parts
+	sessionKey := c.sessionKey
+	chatID := sessionKey
+	if idx := strings.Index(chatID, ":"); idx != -1 {
+		chatID = chatID[idx+1:]
+	}
+
+	fmt.Print("> ")
 
 	for c.running {
 		line, err := reader.ReadString('\n')
@@ -52,46 +52,44 @@ fmt.Print("> ")
 
 		line = strings.TrimSpace(line)
 
-// Handle commands
- 		if strings.HasPrefix(line, "/") {
- 			if strings.EqualFold(line, "/quit") || strings.EqualFold(line, "/exit") {
- 				fmt.Println("Goodbye!")
- 				return nil
- 			}
- 			if strings.EqualFold(line, "/clear") {
-  				if err := c.sessionMgr.ClearSession(sessionKey); err != nil {
-  					fmt.Printf("Error clearing session: %v\n", err)
-  				} else {
-  					fmt.Println("Session cleared.")
-  				}
-  				fmt.Print("> ")
-  				continue
-  			}
- 			fmt.Printf("Unknown command: %s\n", line)
- 			continue
- 		}
+		// Handle commands
+		if strings.HasPrefix(line, "/") {
+			if strings.EqualFold(line, "/quit") || strings.EqualFold(line, "/exit") {
+				fmt.Println("Goodbye!")
+				return nil
+			}
+			if strings.EqualFold(line, "/clear") {
+				if err := c.sessionMgr.ClearSession(sessionKey); err != nil {
+					fmt.Printf("Error clearing session: %v\n", err)
+				} else {
+					fmt.Println("Session cleared.")
+				}
+				fmt.Print("> ")
+				continue
+			}
+			fmt.Printf("Unknown command: %s\n", line)
+			continue
+		}
 
 		if line == "" {
 			continue
 		}
 
-	
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			fmt.Println("\nGoodbye!")
+			return nil
+		default:
+			// Process message through handler
+			if err := handler(ctx, sessionKey, chatID, line); err != nil {
+				logger.Error(err, "failed to process message")
+				fmt.Printf("Error: %v\n", err)
+				continue
+			}
 
-// Check for context cancellation
-  		select {
-  		case <-ctx.Done():
-  			fmt.Println("\nGoodbye!")
-  			return nil
-  		default:
-  			// Process message through handler
-  			if err := handler(ctx, sessionKey, chatID, line); err != nil {
-  				logger.Error(err, "failed to process message")
-  				fmt.Printf("Error: %v\n", err)
-  				continue
-  			}
-
-  			fmt.Print("> ")
- 		}
+			fmt.Print("> ")
+		}
 	}
 
 	return nil

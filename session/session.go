@@ -2,14 +2,14 @@
 package session
 
 import (
- 	"database/sql"
- 	"fmt"
- 	"os"
- 	"path/filepath"
- 	"time"
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
- 	_ "modernc.org/sqlite"
- )
+	_ "modernc.org/sqlite"
+)
 
 // Message represents a single message in a session.
 type Message struct {
@@ -28,17 +28,17 @@ type Session struct {
 }
 
 func (s *Session) initDB(workspace string) error {
- 	dbPath := filepath.Join(workspace, "sessions", sanitizeKey(s.Key)+".db")
- 
- 	// Ensure directory exists
- 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
- 		return err
- 	}
- 
- 	db, err := sql.Open("sqlite", dbPath)
- 	if err != nil {
- 		return err
- 	}
+	dbPath := filepath.Join(workspace, "sessions", sanitizeKey(s.Key)+".db")
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		return err
+	}
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return err
+	}
 
 	// Create sessions table
 	_, err = db.Exec(`
@@ -109,51 +109,51 @@ func (s *Session) AddMessage(role, content string) {
 }
 
 // History returns all messages in the session.
- func (s *Session) History() []Message {
- 	if s.db == nil {
- 		return nil
- 	}
+func (s *Session) History() []Message {
+	if s.db == nil {
+		return nil
+	}
 
- 	rows, err := s.db.Query(`
+	rows, err := s.db.Query(`
  		SELECT id, role, content, timestamp 
  		FROM messages 
  		WHERE session_key = ? 
  		ORDER BY timestamp
  	`, s.Key)
- 	if err != nil {
- 		return nil
- 	}
- 	defer rows.Close()
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
 
- 	var messages []Message
- 	for rows.Next() {
- 		var m Message
- 		var timestampStr string
- 		err := rows.Scan(&m.ID, &m.Role, &m.Content, &timestampStr)
- 		if err != nil {
- 			continue
- 		}
- 		m.Timestamp, _ = time.Parse(time.RFC3339, timestampStr)
- 		messages = append(messages, m)
- 	}
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		var timestampStr string
+		err := rows.Scan(&m.ID, &m.Role, &m.Content, &timestampStr)
+		if err != nil {
+			continue
+		}
+		m.Timestamp, _ = time.Parse(time.RFC3339, timestampStr)
+		messages = append(messages, m)
+	}
 
- 	return messages
- }
+	return messages
+}
 
- // MessageCount returns the total number of messages in the session.
- func (s *Session) MessageCount() int {
- 	if s.db == nil {
- 		return 0
- 	}
+// MessageCount returns the total number of messages in the session.
+func (s *Session) MessageCount() int {
+	if s.db == nil {
+		return 0
+	}
 
- 	var count int
- 	err := s.db.QueryRow("SELECT COUNT(*) FROM messages WHERE session_key = ?", s.Key).Scan(&count)
- 	if err != nil {
- 		return 0
- 	}
+	var count int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM messages WHERE session_key = ?", s.Key).Scan(&count)
+	if err != nil {
+		return 0
+	}
 
- 	return count
- }
+	return count
+}
 
 // RecentMessages returns the last N messages.
 func (s *Session) RecentMessages(n int) []Message {
@@ -205,11 +205,11 @@ func (s *Session) Clear() {
 }
 
 // Close closes the database connection.
- func (s *Session) Close() error {
- 	if s.db != nil {
- 		err := s.db.Close()
- 		s.db = nil
- 		return err
- 	}
- 	return nil
- }
+func (s *Session) Close() error {
+	if s.db != nil {
+		err := s.db.Close()
+		s.db = nil
+		return err
+	}
+	return nil
+}

@@ -1,42 +1,42 @@
 package session
 
- import (
- 	"database/sql"
- 	"fmt"
- 	"os"
- 	"path/filepath"
- 	"strings"
- 	"sync"
- 	"time"
+import (
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 
- 	_ "modernc.org/sqlite"
- )
+	_ "modernc.org/sqlite"
+)
 
- // sanitizeKey converts a session key to a safe filename.
- func sanitizeKey(key string) string {
- 	// Replace invalid filename characters
- 	safe := strings.ReplaceAll(key, ":", "_")
- 	safe = strings.ReplaceAll(safe, "/", "_")
- 	safe = strings.ReplaceAll(safe, "\\", "_")
- 	return safe
- }
+// sanitizeKey converts a session key to a safe filename.
+func sanitizeKey(key string) string {
+	// Replace invalid filename characters
+	safe := strings.ReplaceAll(key, ":", "_")
+	safe = strings.ReplaceAll(safe, "/", "_")
+	safe = strings.ReplaceAll(safe, "\\", "_")
+	return safe
+}
 
 // Manager manages conversation sessions using SQLite.
- type Manager struct {
- 	baseDir   string
- 	workspace string
- 	sessions  map[string]*Session
- 	mu        sync.RWMutex
- }
+type Manager struct {
+	baseDir   string
+	workspace string
+	sessions  map[string]*Session
+	mu        sync.RWMutex
+}
 
 // NewManager creates a new session manager.
- func NewManager(baseDir, workspace string) *Manager {
- 	return &Manager{
- 		baseDir:   baseDir,
- 		workspace: workspace,
- 		sessions:  make(map[string]*Session),
- 	}
- }
+func NewManager(baseDir, workspace string) *Manager {
+	return &Manager{
+		baseDir:   baseDir,
+		workspace: workspace,
+		sessions:  make(map[string]*Session),
+	}
+}
 
 // GetOrCreate returns an existing session or creates a new one.
 func (m *Manager) GetOrCreate(key string) *Session {
@@ -108,12 +108,12 @@ func (m *Manager) load(key string) (*Session, error) {
 		return nil, err
 	}
 
-sess := &Session{
- 		Key:       key,
- 		db:        db,
- 		createdAt: time.Time{},
- 		updatedAt: time.Time{},
- 	}
+	sess := &Session{
+		Key:       key,
+		db:        db,
+		createdAt: time.Time{},
+		updatedAt: time.Time{},
+	}
 
 	// Get creation time
 	var createdAt string
@@ -133,9 +133,9 @@ sess := &Session{
 }
 
 func (m *Manager) sessionPath(key string) string {
-   	safeKey := sanitizeKey(key)
-   	return filepath.Join(m.baseDir, "sessions", safeKey+".db")
-   }
+	safeKey := sanitizeKey(key)
+	return filepath.Join(m.baseDir, "sessions", safeKey+".db")
+}
 
 // SessionPath returns the file path for a session key (exported version).
 func (m *Manager) SessionPath(key string) string {
@@ -144,12 +144,12 @@ func (m *Manager) SessionPath(key string) string {
 
 // ListSessions returns a list of all session keys (filenames without .db).
 func (m *Manager) ListSessions() []string {
- 	sessionDir := filepath.Join(m.baseDir, "sessions")
+	sessionDir := filepath.Join(m.baseDir, "sessions")
 
-// Check if session directory exists
-   	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
-   		return nil
-   	}
+	// Check if session directory exists
+	if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
+		return nil
+	}
 
 	entries, err := os.ReadDir(sessionDir)
 	if err != nil {
@@ -169,18 +169,18 @@ func (m *Manager) ListSessions() []string {
 
 // Clear removes all session files from disk and clears in-memory cache.
 func (m *Manager) Clear() error {
- 	m.mu.Lock()
- 	defer m.mu.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
- 	// Clear in-memory sessions
- 	m.sessions = make(map[string]*Session)
+	// Clear in-memory sessions
+	m.sessions = make(map[string]*Session)
 
- 	sessionDir := filepath.Join(m.baseDir, "sessions")
+	sessionDir := filepath.Join(m.baseDir, "sessions")
 
-// Check if session directory exists
- 	if _, err := os.Stat(sessionDir); err != nil {
- 		return nil // Nothing to clear
- 	}
+	// Check if session directory exists
+	if _, err := os.Stat(sessionDir); err != nil {
+		return nil // Nothing to clear
+	}
 
 	// Remove entire sessions directory
 	if err := os.RemoveAll(sessionDir); err != nil {
@@ -192,21 +192,21 @@ func (m *Manager) Clear() error {
 }
 
 // ClearSession removes a specific session from memory and disk.
- func (m *Manager) ClearSession(key string) error {
- 	m.mu.Lock()
- 	defer m.mu.Unlock()
- 
- 	// Remove from memory (and close any open DB connections)
- 	if sess, exists := m.sessions[key]; exists {
- 		sess.Close()
- 	}
- 	delete(m.sessions, key)
- 
- 	// Remove from disk
- 	path := m.sessionPath(key)
- 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
- 		return err
- 	}
- 
- 	return nil
- }
+func (m *Manager) ClearSession(key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Remove from memory (and close any open DB connections)
+	if sess, exists := m.sessions[key]; exists {
+		sess.Close()
+	}
+	delete(m.sessions, key)
+
+	// Remove from disk
+	path := m.sessionPath(key)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}

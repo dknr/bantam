@@ -2,16 +2,16 @@
 package tracing
 
 import (
-  "context"
-  "fmt"
+	"context"
+	"fmt"
 
-  "go.opentelemetry.io/otel"
-  "go.opentelemetry.io/otel/attribute"
-  "go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-  "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-  "go.opentelemetry.io/otel/sdk/resource"
-  sdktrace "go.opentelemetry.io/otel/sdk/trace"
-  oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -27,7 +27,7 @@ func SetupOTEL(endpoint, serviceName string) error {
 		return nil
 	}
 
-// Create OTLP gRPC exporter
+	// Create OTLP gRPC exporter
 	client := otlptracegrpc.NewClient(
 		otlptracegrpc.WithInsecure(),
 		otlptracegrpc.WithEndpoint(endpoint),
