@@ -97,8 +97,9 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 			}
 			schema["properties"].(map[string]any)["path"] = map[string]any{
 				"type":        "string",
-				"description": "The file or directory path",
+				"description": "Path relative to workspace. Use relative paths only (e.g., 'file.md', 'subdir/file.txt'). Never use absolute paths.",
 			}
+			schema["description"] = "Read, write, or list files in the workspace directory. Only relative paths are allowed."
 			schema["required"] = []string{"action", "path"}
 		case "memory":
 			schema["properties"].(map[string]any)["action"] = map[string]any{

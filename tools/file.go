@@ -98,6 +98,11 @@ func (t *FileTool) readFile(_ context.Context, args map[string]any) (any, error)
 		return "", fmt.Errorf("path argument is required")
 	}
 
+	// Check for absolute paths
+	if filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("paths must be relative to the workspace directory. Use relative paths like 'file.md' instead of absolute paths.")
+	}
+
 	absPath, err := t.validatePath(relPath)
 	if err != nil {
 		return "", err
@@ -115,6 +120,11 @@ func (t *FileTool) writeFile(_ context.Context, args map[string]any) (any, error
 	relPath, ok := args["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path argument is required")
+	}
+
+	// Check for absolute paths
+	if filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("paths must be relative to the workspace directory. Use relative paths like 'file.md' instead of absolute paths.")
 	}
 
 	absPath, err := t.validatePath(relPath)
@@ -144,6 +154,11 @@ func (t *FileTool) listDirectory(_ context.Context, args map[string]any) (any, e
 	relPath, ok := args["path"].(string)
 	if !ok {
 		relPath = "."
+	}
+
+	// Check for absolute paths
+	if filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("paths must be relative to the workspace directory. Use relative paths like 'file.md' instead of absolute paths.")
 	}
 
 	absPath, err := t.validatePath(relPath)
