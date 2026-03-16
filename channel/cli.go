@@ -89,15 +89,19 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	for c.running {
 		line, err := c.reader.Readline()
 		if err != nil {
-			if err.Error() == "Interrupt" {
-				// Ctrl+C pressed - readline clears the line automatically
-				// Continue to show new prompt
+			// Debug: log the error to understand what's happening
+			// fmt.Fprintf(os.Stderr, "DEBUG Readline err: %v (%T)\n", err, err)
+			errStr := err.Error()
+			if errStr == "Interrupt" || errStr == "interrupt" {
+				// Ctrl+C pressed - clear line and show new prompt
+				// readline has already cleared the line, just continue
 				continue
 			}
-			if err.Error() == "EOF" {
-				// EOF on stdin - Ctrl+D pressed
-				fmt.Println("\nGoodbye!")
-				return nil
+			if errStr == "EOF" {
+				// EOF on stdin - could be Ctrl+D or readline entering EOF state after interrupt
+				// In interactive mode, we should only exit on actual EOF (Ctrl+D on empty line)
+				// After an interrupt, readline may return EOF - just continue
+				continue
 			}
 			logger.Error(err, "failed to read input")
 			continue
@@ -172,6 +176,11 @@ func (c *CLIChannel) CancelProcessing() {
 	if c.procCancel != nil {
 		c.procCancel()
 	}
+}
+
+// IsProcessing returns true if we're currently processing a message.
+func (c *CLIChannel) IsProcessing() bool {
+	return c.inProcessing
 }
 
 // customDarkStyle is the dark style with no margins on document or code blocks
