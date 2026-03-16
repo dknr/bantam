@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
@@ -28,9 +29,8 @@ var (
 
 // Config represents the bantam configuration
 type Config struct {
-	Workspace    string `yaml:"workspace"`
-	SystemPrompt string `yaml:"systemPrompt,omitempty"`
-	Tracing      struct {
+	Workspace string `yaml:"workspace"`
+	Tracing   struct {
 		Endpoint    string `yaml:"endpoint"`
 		ServiceName string `yaml:"serviceName"`
 	} `yaml:"tracing"`
@@ -149,15 +149,14 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 		tr.Register(memoryTool)
 	}
 
-	// Determine system prompt
-	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
-	if systemPrompt == "" {
-		if config.SystemPrompt != "" {
-			systemPrompt = config.SystemPrompt
-		} else {
-			// Agent will read soul.md from workspace
-			systemPrompt = "Read soul.md from your workspace for your identity and instructions."
-		}
+	// Load system prompt from soul.md in workspace
+	var systemPrompt string
+	soulPath := filepath.Join(paths.WorkspaceDir, "soul.md")
+	if systemPromptData, err := os.ReadFile(soulPath); err == nil {
+		systemPrompt = string(systemPromptData)
+	} else {
+		// Fallback if soul.md doesn't exist
+		systemPrompt = "Read soul.md from your workspace for your identity and instructions."
 	}
 
 	// Create agent
