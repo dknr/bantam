@@ -99,9 +99,10 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 			}
 			if errStr == "EOF" {
 				// EOF on stdin - could be Ctrl+D or readline entering EOF state after interrupt
-				// In interactive mode, we should only exit on actual EOF (Ctrl+D on empty line)
-				// After an interrupt, readline may return EOF - just continue
-				continue
+				// Try to detect if it's actual EOF (user pressed Ctrl+D on empty line)
+				// For now, just exit - we can refine this later
+				fmt.Println("\nGoodbye!")
+				return nil
 			}
 			logger.Error(err, "failed to read input")
 			continue
