@@ -1,7 +1,6 @@
 package channel
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -9,7 +8,9 @@ import (
 	"time"
 
 	"charm.land/glamour/v2"
+	"github.com/chzyer/readline"
 	"github.com/dknr/bantam/logging"
+	"github.com/dknr/bantam/paths"
 	"github.com/dknr/bantam/provider"
 	"github.com/dknr/bantam/session"
 	"golang.org/x/term"
@@ -21,6 +22,7 @@ type CLIChannel struct {
 	sessionMgr *session.Manager
 	sessionKey string
 	termWidth  int
+	reader     *readline.Instance
 }
 
 // NewCLIChannel creates a new CLI channel.
@@ -42,7 +44,23 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	c.running = true
 	logger := logging.FromContext(ctx)
 
-	reader := bufio.NewReader(os.Stdin)
+	// Setup readline with history file
+	historyPath := paths.BaseDir + "/history"
+	if err := os.MkdirAll(paths.BaseDir, 0755); err != nil {
+		return fmt.Errorf("failed to create base dir: %w", err)
+	}
+	var err error
+	c.reader, err = readline.NewEx(&readline.Config{
+		Prompt:          "> ",
+		HistoryFile:     historyPath,
+		InterruptPrompt: "^C",
+		EOFPrompt:       "exit",
+	})
+	if err != nil {
+		return err
+	}
+	defer c.reader.Close()
+
 	// Extract session key parts
 	sessionKey := c.sessionKey
 	chatID := sessionKey
@@ -50,11 +68,13 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 		chatID = chatID[idx+1:]
 	}
 
-	fmt.Print("> ")
-
 	for c.running {
-		line, err := reader.ReadString('\n')
+		line, err := c.reader.Readline()
 		if err != nil {
+			if err == readline.ErrInterrupt || err.Error() == "EOF" {
+				fmt.Println("\nGoodbye!")
+				return nil
+			}
 			logger.Error(err, "failed to read input")
 			continue
 		}
@@ -73,7 +93,6 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 				} else {
 					fmt.Println("Session cleared.")
 				}
-				fmt.Print("> ")
 				continue
 			}
 			fmt.Printf("Unknown command: %s\n", line)
@@ -96,8 +115,6 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 				fmt.Printf("Error: %v\n", err)
 				continue
 			}
-
-			fmt.Print("> ")
 		}
 	}
 
@@ -107,6 +124,9 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 // Stop ends the channel.
 func (c *CLIChannel) Stop() error {
 	c.running = false
+	if c.reader != nil {
+		c.reader.Close()
+	}
 	return nil
 }
 
