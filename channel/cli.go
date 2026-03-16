@@ -18,11 +18,13 @@ import (
 
 // CLIChannel implements the Channel interface for terminal input/output.
 type CLIChannel struct {
-	running    bool
-	sessionMgr *session.Manager
-	sessionKey string
-	termWidth  int
-	reader     *readline.Instance
+	running      bool
+	sessionMgr   *session.Manager
+	sessionKey   string
+	termWidth    int
+	reader       *readline.Instance
+	inProcessing bool               // Track if we're in the middle of processing a message
+	procCancel   context.CancelFunc // Cancel function for interrupting LLM processing
 }
 
 // NewCLIChannel creates a new CLI channel.
@@ -64,8 +66,18 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	c.reader.CaptureExitSignal()
 
 	// Create a cancelable context for interrupting LLM processing
-	procCtx, procCancel := context.WithCancel(ctx)
+	// Use context.Background() so it's independent from ctx
+	procCtx, procCancel := context.WithCancel(context.Background())
 	defer procCancel()
+
+	// Goroutine to sync procCtx with ctx (for quit signals)
+	go func() {
+		<-ctx.Done()
+		procCancel()
+	}()
+
+	// Set procCancel on the channel so external code can cancel processing
+	c.procCancel = procCancel
 
 	// Extract session key parts
 	sessionKey := c.sessionKey
@@ -115,6 +127,9 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 			continue
 		}
 
+		// Mark that we're processing
+		c.inProcessing = true
+
 		// Check for context cancellation (from /quit command or Ctrl+D)
 		select {
 		case <-ctx.Done():
@@ -125,18 +140,16 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 			_ = handler(procCtx, sessionKey, chatID, line)
 		}
 
+		// Mark that we're done processing
+		c.inProcessing = false
+
 		// Check if LLM processing was cancelled (Ctrl+C during processing)
 		select {
 		case <-procCtx.Done():
 			fmt.Println("\n[Processing cancelled]")
-		default:
-			// Processing completed or was not cancelled
-		}
-
-		// Check if processing was cancelled (e.g., by Ctrl+C during LLM processing)
-		select {
-		case <-procCtx.Done():
-			fmt.Println("\n[Processing cancelled]")
+			// Reset the procCtx for the next request
+			procCtx, procCancel = context.WithCancel(context.Background())
+			c.procCancel = procCancel
 		default:
 			// Processing completed or was not cancelled
 		}
@@ -152,6 +165,13 @@ func (c *CLIChannel) Stop() error {
 		c.reader.Close()
 	}
 	return nil
+}
+
+// CancelProcessing cancels the current LLM processing (e.g., on Ctrl+C).
+func (c *CLIChannel) CancelProcessing() {
+	if c.procCancel != nil {
+		c.procCancel()
+	}
 }
 
 // customDarkStyle is the dark style with no margins on document or code blocks

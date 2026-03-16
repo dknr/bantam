@@ -63,7 +63,9 @@ var runCmd = &cobra.Command{
 
 		go func() {
 			<-sigChan
-			cancel()
+			// First cancel LLM processing if in progress
+			cli.CancelProcessing()
+			// Don't cancel main context - that will be done by /quit or Ctrl+D
 		}()
 
 		// Start CLI channel with handler that processes messages
