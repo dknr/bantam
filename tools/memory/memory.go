@@ -53,6 +53,49 @@ func (t *MemoryTool) Execute(ctx context.Context, args map[string]any) (any, err
 	}
 }
 
+// StatusLine returns a formatted status line for the memory operation.
+func (t *MemoryTool) StatusLine(args map[string]any) string {
+	action, _ := args["action"].(string)
+
+	// Normalize action name
+	action = strings.TrimPrefix(action, "memory_")
+	action = strings.TrimPrefix(action, "history_")
+
+	switch action {
+	case "read":
+		key, _ := args["key"].(string)
+		return fmt.Sprintf("memory> read %s", key)
+	case "write":
+		key, _ := args["key"].(string)
+		oldValue, _ := args["old_value"].(string)
+		newValue, _ := args["new_value"].(string)
+		oldDisplay := "empty"
+		if oldValue != "" {
+			oldDisplay = truncateValue(oldValue, 20)
+		}
+		newDisplay := truncateValue(newValue, 20)
+		return fmt.Sprintf("memory> write %s [%s→%s]", key, oldDisplay, newDisplay)
+	case "list":
+		return "memory> list"
+	case "search":
+		query, _ := args["query"].(string)
+		return fmt.Sprintf("memory> search %s", truncateValue(query, 30))
+	case "since":
+		timestamp, _ := args["timestamp"].(string)
+		return fmt.Sprintf("memory> since %s", timestamp)
+	default:
+		return fmt.Sprintf("memory> %s", action)
+	}
+}
+
+// truncateValue shortens long values for display, adding ellipsis.
+func truncateValue(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}
+
 // memoryRead reads a memory entry by key.
 func (t *MemoryTool) memoryRead(_ context.Context, args map[string]any) (any, error) {
 	key, ok := args["key"].(string)
