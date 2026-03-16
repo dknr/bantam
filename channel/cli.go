@@ -54,7 +54,7 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	c.reader, err = readline.NewEx(&readline.Config{
 		Prompt:      "> ",
 		HistoryFile: historyPath,
-		EOFPrompt:   "exit",
+		EOFPrompt:   "^D",
 	})
 	if err != nil {
 		return err
@@ -93,9 +93,9 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 				continue
 			}
 			if err.Error() == "EOF" {
-				// EOF on stdin - in interactive mode this shouldn't happen
-				// but in piped tests it will. Just continue.
-				continue
+				// EOF on stdin - Ctrl+D pressed
+				fmt.Println("\nGoodbye!")
+				return nil
 			}
 			logger.Error(err, "failed to read input")
 			continue
@@ -132,11 +132,7 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 			return nil
 		default:
 			// Process message through handler
-			if err := handler(procCtx, sessionKey, chatID, line); err != nil {
-				logger.Error(err, "failed to process message")
-				fmt.Printf("Error: %v\n", err)
-				continue
-			}
+			_ = handler(procCtx, sessionKey, chatID, line)
 		}
 
 		// Check if processing was cancelled (e.g., by Ctrl+C during LLM processing)
