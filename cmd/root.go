@@ -11,6 +11,7 @@ import (
 	"github.com/dknr/bantam/provider"
 	bantsession "github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
+	"github.com/dknr/bantam/tools/memory"
 	"github.com/dknr/bantam/tracing"
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
@@ -114,7 +115,8 @@ func init() {
 }
 
 // getAgent creates and returns a configured agent
-func getAgent(logger logr.Logger) (*agent.Agent, error) {
+// Returns the memoryTool for cleanup if needed.
+func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 	// Create provider
 	apiKey := os.Getenv("BANTAM_API_KEY")
 	apiBase := os.Getenv("BANTAM_API_BASE")
@@ -140,6 +142,12 @@ func getAgent(logger logr.Logger) (*agent.Agent, error) {
 	tr.Register(tools.NewFileTool(paths.WorkspaceDir))
 	tr.Register(tools.NewTimeTool())
 	tr.Register(tools.NewEchoTool())
+	memoryTool, err := memory.NewMemoryTool(paths.BaseDir)
+	if err != nil {
+		logger.Error(err, "failed to initialize memory tool")
+	} else {
+		tr.Register(memoryTool)
+	}
 
 	// Determine system prompt
 	systemPrompt := os.Getenv("BANTAM_SYSTEM_PROMPT")
@@ -153,7 +161,7 @@ func getAgent(logger logr.Logger) (*agent.Agent, error) {
 	}
 
 	// Create agent
-	return agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt), nil
+	return agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt), memoryTool, nil
 }
 
 // getCLIChannel creates and returns a CLI channel

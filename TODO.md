@@ -1,5 +1,23 @@
 # Bantam TODO
 
+## Memory Feature (SQLite-based)
+
+### Phase 1: MVP (In Progress)
+- [ ] Create `tools/memory/db.go` - SQLite connection, schema initialization
+- [ ] Create `tools/memory/memory.go` - Tool definitions with noun-verb naming:
+  - `memory_read` - Get fact by key
+  - `memory_write` - Insert/update with compare-exchange (old + new value)
+  - `history_search` - Search history entries
+  - `memory_list` - List all memory keys
+  - `history_since` - Get entries since timestamp
+- [ ] Register memory tool in `cmd/root.go`
+- [ ] Add schema to `tools/tools.go` DefinitionsWithSchema()
+
+### Later Phases
+- [ ] Phase 2: CLI Commands (`/mem read`, `/mem list`, `/mem history`)
+- [ ] Phase 3: Auto-Consolidation (append to history, extract facts)
+- [ ] Phase 4: Vector Search (embeddings, semantic search)
+
 ## Completed
 - Config file support with `--init-config`, `--prompt`, `--clear` flags
 - Test tools: `time` and `echo`

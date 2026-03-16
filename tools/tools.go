@@ -100,6 +100,32 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 				"description": "The file or directory path",
 			}
 			schema["required"] = []string{"action", "path"}
+		case "memory":
+			schema["properties"].(map[string]any)["action"] = map[string]any{
+				"type":        "string",
+				"description": "The action to perform: read, write, list, search, or since",
+			}
+			schema["properties"].(map[string]any)["key"] = map[string]any{
+				"type":        "string",
+				"description": "The memory key (required for read/write actions)",
+			}
+			schema["properties"].(map[string]any)["old_value"] = map[string]any{
+				"type":        "string",
+				"description": "The expected current value (for compare-exchange write, empty string if new)",
+			}
+			schema["properties"].(map[string]any)["new_value"] = map[string]any{
+				"type":        "string",
+				"description": "The new value to store",
+			}
+			schema["properties"].(map[string]any)["query"] = map[string]any{
+				"type":        "string",
+				"description": "The search query for history entries",
+			}
+			schema["properties"].(map[string]any)["timestamp"] = map[string]any{
+				"type":        "string",
+				"description": "Timestamp in ISO8601 format for history_since action",
+			}
+			schema["required"] = []string{"action"}
 		}
 
 		defs = append(defs, map[string]any{

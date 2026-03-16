@@ -31,10 +31,15 @@ var promptCmd = &cobra.Command{
 		defer tracing.ShutdownOTEL()
 
 		// Create agent
-		ag, err := getAgent(logger)
+		ag, memoryTool, err := getAgent(logger)
 		if err != nil {
 			return err
 		}
+		defer func() {
+			if memoryTool != nil {
+				memoryTool.Close()
+			}
+		}()
 
 		// Create session manager
 		sessions := bantsession.NewManager(paths.SessionsDir)

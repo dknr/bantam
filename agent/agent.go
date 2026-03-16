@@ -249,3 +249,8 @@ func boolToInt(b bool) int {
 	}
 	return 0
 }
+
+// Close closes the agent and any resources it holds.
+func (a *Agent) Close() {
+	// Memory tool is closed by the caller (cmd/root.go)
+}
