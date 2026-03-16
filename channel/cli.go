@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -60,6 +61,22 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	}
 	defer c.reader.Close()
 
+	// Capture exit signals to prevent readline from killing the program
+	c.reader.CaptureExitSignal()
+
+	// Create a cancelable context for interrupting LLM processing
+	procCtx, procCancel := context.WithCancel(ctx)
+	defer procCancel()
+
+	// Install SIGINT handler that cancels the processing context instead of exiting
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt)
+
+	go func() {
+		<-sigChan
+		procCancel() // Cancel LLM processing, don't exit
+	}()
+
 	// Extract session key parts
 	sessionKey := c.sessionKey
 	chatID := sessionKey
@@ -108,18 +125,26 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 			continue
 		}
 
-		// Check for context cancellation
+		// Check for context cancellation (from /quit command)
 		select {
 		case <-ctx.Done():
 			fmt.Println("\nGoodbye!")
 			return nil
 		default:
 			// Process message through handler
-			if err := handler(ctx, sessionKey, chatID, line); err != nil {
+			if err := handler(procCtx, sessionKey, chatID, line); err != nil {
 				logger.Error(err, "failed to process message")
 				fmt.Printf("Error: %v\n", err)
 				continue
 			}
+		}
+
+		// Check if processing was cancelled (e.g., by Ctrl+C during LLM processing)
+		select {
+		case <-procCtx.Done():
+			fmt.Println("\n[Processing cancelled]")
+		default:
+			// Processing completed or was not cancelled
 		}
 	}
 
