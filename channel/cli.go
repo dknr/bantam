@@ -51,10 +51,9 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	}
 	var err error
 	c.reader, err = readline.NewEx(&readline.Config{
-		Prompt:          "> ",
-		HistoryFile:     historyPath,
-		InterruptPrompt: "^C",
-		EOFPrompt:       "exit",
+		Prompt:      "> ",
+		HistoryFile: historyPath,
+		EOFPrompt:   "exit",
 	})
 	if err != nil {
 		return err
@@ -71,20 +70,15 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	for c.running {
 		line, err := c.reader.Readline()
 		if err != nil {
-			if err == readline.ErrInterrupt {
-				// readline clears the line buffer on interrupt
-				// Check if there was content using Line()
-				if result := c.reader.Line(); result != nil && result.Line != "" {
-					// There was text on the line - just continue (line already cleared by readline)
-					continue
-				}
-				// Empty line or no result - exit
-				fmt.Println("\nGoodbye!")
-				return nil
+			if err.Error() == "Interrupt" {
+				// Ctrl+C pressed - readline clears the line automatically
+				// Continue to show new prompt
+				continue
 			}
 			if err.Error() == "EOF" {
-				fmt.Println("\nGoodbye!")
-				return nil
+				// EOF on stdin - in interactive mode this shouldn't happen
+				// but in piped tests it will. Just continue.
+				continue
 			}
 			logger.Error(err, "failed to read input")
 			continue
