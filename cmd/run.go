@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/dknr/bantam/channel"
@@ -20,7 +22,8 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Setup logger
 		logger := logging.NewLogger(paths.LogsDir, verbose)
-		ctx := logging.NewContextWithLogger(context.Background(), logger)
+		ctx, cancel := context.WithCancel(context.Background())
+		ctx = logging.NewContextWithLogger(ctx, logger)
 		ctx = logging.SetVerbose(ctx, verbose)
 
 		// Setup OpenTelemetry
@@ -54,6 +57,15 @@ var runCmd = &cobra.Command{
 		// Create CLI channel
 		cli := channel.NewCLIChannelWithWidth(sessions, sessionKey, termWidth)
 
+		// Set up signal handler for graceful exit
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt)
+
+		go func() {
+			<-sigChan
+			cancel()
+		}()
+
 		// Start CLI channel with handler that processes messages
 		go func() {
 			err := cli.Start(ctx, func(ctx context.Context, sessionKey, chatID, content string) error {
@@ -76,6 +88,8 @@ var runCmd = &cobra.Command{
 			if err != nil {
 				logger.Error(err, "channel error")
 			}
+			// Channel exited (EOF, /quit, etc.) - cancel context to exit
+			cancel()
 		}()
 
 		// Wait for context cancellation (from /quit command)
