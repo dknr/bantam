@@ -71,7 +71,18 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	for c.running {
 		line, err := c.reader.Readline()
 		if err != nil {
-			if err == readline.ErrInterrupt || err.Error() == "EOF" {
+			if err == readline.ErrInterrupt {
+				// readline clears the line buffer on interrupt
+				// Check if there was content using Line()
+				if result := c.reader.Line(); result != nil && result.Line != "" {
+					// There was text on the line - just continue (line already cleared by readline)
+					continue
+				}
+				// Empty line or no result - exit
+				fmt.Println("\nGoodbye!")
+				return nil
+			}
+			if err.Error() == "EOF" {
 				fmt.Println("\nGoodbye!")
 				return nil
 			}

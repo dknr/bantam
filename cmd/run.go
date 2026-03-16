@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"time"
 
 	"github.com/dknr/bantam/channel"
@@ -54,9 +56,22 @@ var runCmd = &cobra.Command{
 		// Create CLI channel
 		cli := channel.NewCLIChannelWithWidth(sessions, sessionKey, termWidth)
 
+		// Create cancelable context for graceful shutdown
+		cancelCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		// Set up signal handler for SIGINT (Ctrl+C)
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt)
+
+		go func() {
+			<-sigChan
+			cancel() // Cancel context on Ctrl+C
+		}()
+
 		// Start CLI channel with handler that processes messages
 		go func() {
-			err := cli.Start(ctx, func(ctx context.Context, sessionKey, chatID, content string) error {
+			err := cli.Start(cancelCtx, func(ctx context.Context, sessionKey, chatID, content string) error {
 				response, stats, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
 				if err != nil {
 					logger.Error(err, "failed to process message")
@@ -78,8 +93,8 @@ var runCmd = &cobra.Command{
 			}
 		}()
 
-		// Wait for context cancellation (from /quit command)
-		<-ctx.Done()
+		// Wait for context cancellation (from /quit command or Ctrl+C)
+		<-cancelCtx.Done()
 
 		// Cleanup
 		if err := cli.Stop(); err != nil {
