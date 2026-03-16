@@ -109,6 +109,9 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 	resp, err := a.provider.Chat(ctx, messages, a.toolRegistry.DefinitionsWithSchema())
 	durationMs := time.Since(startTime).Milliseconds()
 	if err != nil {
+		// Remove the user message from session since LLM call failed
+		// This prevents cancelled messages from being re-sent
+		sess.RemoveLastUserMessage()
 		if chatSpan != nil {
 			chatSpan.SetStatus(codes.Error, err.Error())
 			chatSpan.End()

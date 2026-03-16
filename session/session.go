@@ -202,6 +202,24 @@ func (s *Session) Clear() {
 	s.updatedAt = time.Now()
 }
 
+// RemoveLastUserMessage removes the most recent user message from the session.
+func (s *Session) RemoveLastUserMessage() {
+	if s.db == nil {
+		return
+	}
+
+	s.db.Exec(`
+ 		DELETE FROM messages 
+ 		WHERE id = (
+ 			SELECT id FROM messages 
+ 			WHERE session_key = ? AND role = 'user' 
+ 			ORDER BY timestamp DESC LIMIT 1
+ 		)
+ 	`, s.Key)
+	s.db.Exec(`UPDATE sessions SET updated_at = ? WHERE key = ?`, time.Now().Format(time.RFC3339), s.Key)
+	s.updatedAt = time.Now()
+}
+
 // Close closes the database connection.
 func (s *Session) Close() error {
 	if s.db != nil {
