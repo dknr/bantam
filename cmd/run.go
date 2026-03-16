@@ -66,6 +66,10 @@ var runCmd = &cobra.Command{
 			// First cancel LLM processing if in progress
 			cli.CancelProcessing()
 			// Don't cancel main context - that will be done by /quit or Ctrl+D
+			// Only cancel if not in processing (i.e., at prompt)
+			if !cli.IsProcessing() {
+				cancel()
+			}
 		}()
 
 		// Start CLI channel with handler that processes messages
