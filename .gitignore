@@ -39,3 +39,4 @@ Thumbs.db
 # Go mod
 go.sum
 bantam
+.crush/

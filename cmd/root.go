@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
@@ -149,18 +148,8 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 		tr.Register(memoryTool)
 	}
 
-	// Load system prompt from soul.md in workspace
-	var systemPrompt string
-	soulPath := filepath.Join(paths.WorkspaceDir, "soul.md")
-	if systemPromptData, err := os.ReadFile(soulPath); err == nil {
-		systemPrompt = string(systemPromptData)
-	} else {
-		// Fallback if soul.md doesn't exist
-		systemPrompt = "Read soul.md from your workspace for your identity and instructions."
-	}
-
 	// Create agent
-	return agent.NewWithSystemPrompt(p, tr, sessions, systemPrompt), memoryTool, nil
+	return agent.New(p, tr, sessions), memoryTool, nil
 }
 
 // getCLIChannel creates and returns a CLI channel

@@ -38,8 +38,7 @@ var initCmd = &cobra.Command{
 
 		// Write config
 		configContent := `workspace: ` + workspace + `
-systemPrompt: |
-  Read soul.md from your workspace for your identity and instructions.
+
 tracing:
   endpoint: ""
   serviceName: bantam

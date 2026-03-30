@@ -9,36 +9,46 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dknr/bantam/logging"
+	"github.com/dknr/bantam/paths"
 	"github.com/dknr/bantam/provider"
 	"github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
 	"github.com/dknr/bantam/tracing"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"github.com/go-logr/logr"
 )
+
+func loadSystemPrompt(logger logr.Logger, workspaceDir string) string {
+	soulPath := filepath.Join(workspaceDir, "soul.md")
+	if data, err := os.ReadFile(soulPath); err == nil {
+		logger.Info("Loaded system prompt from soul.md", "path", soulPath)
+		return string(data)
+	}
+	// Fallback if soul.md doesn't exist
+	fallback := "Read soul.md from your workspace for your identity and instructions."
+	logger.Info("soul.md not found, using fallback system prompt", "path", soulPath)
+	return fallback
+}
 
 // Agent is the core agent instance.
 type Agent struct {
 	provider     provider.Provider
 	toolRegistry *tools.Registry
 	sessionMgr   *session.Manager
-	systemPrompt string
 }
 
 // New creates a new Agent instance.
 func New(p provider.Provider, tools *tools.Registry, sessions *session.Manager) *Agent {
-	return NewWithSystemPrompt(p, tools, sessions, "")
-}
-
-func NewWithSystemPrompt(p provider.Provider, tools *tools.Registry, sessions *session.Manager, systemPrompt string) *Agent {
 	return &Agent{
 		provider:     p,
 		toolRegistry: tools,
 		sessionMgr:   sessions,
-		systemPrompt: systemPrompt,
 	}
 }
 
@@ -94,7 +104,11 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 
 	// Load or create session for this conversation
 	sess := a.sessionMgr.GetOrCreate(sessionKey)
-
+	// If session is new, add system prompt as first message
+	if sess.MessageCount() == 0 {
+		systemPrompt := loadSystemPrompt(logger, paths.WorkspaceDir)
+		sess.AddMessage("system", systemPrompt)
+	}
 	// Add user message to session
 	sess.AddMessage("user", content)
 
@@ -272,14 +286,7 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 	// Build messages array
 	messages := make([]map[string]any, 0, len(history)+1)
 
-	// Prepend system prompt if set
-	if a.systemPrompt != "" {
-		messages = append(messages, map[string]any{
-			"role":    "system",
-			"content": a.systemPrompt,
-		})
-	}
-
+	
 	for _, msg := range history {
 		if msg.Role == "assistant" {
 			// Check if the content is a JSON string with tool_calls

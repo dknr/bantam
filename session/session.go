@@ -116,7 +116,7 @@ func (s *Session) History() []Message {
  		SELECT id, role, content, timestamp 
  		FROM messages 
  		WHERE session_key = ? 
- 		ORDER BY timestamp
+ 		ORDER BY id
  	`, s.Key)
 	if err != nil {
 		return nil
@@ -163,7 +163,7 @@ func (s *Session) RecentMessages(n int) []Message {
 		SELECT id, role, content, timestamp 
 		FROM messages 
 		WHERE session_key = ? 
-		ORDER BY timestamp DESC 
+		ORDER BY id DESC 
 		LIMIT ?
 	`, s.Key, n)
 	if err != nil {
