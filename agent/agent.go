@@ -7,6 +7,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -102,6 +103,16 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 
 	// Call LLM with timing
 	logger.Info("calling LLM", "messages_count", len(messages))
+	if logging.IsVerbose(ctx) {
+		reqData := map[string]any{
+			"channel":     channel,
+			"chat_id":     chatID,
+			"content":     content,
+			"session_key": fmt.Sprintf("%s:%s", channel, chatID),
+			"messages":    messages,
+		}
+		logging.PrintJSON("Request", reqData)
+	}
 	startTime := time.Now()
 	ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.chat", map[string]string{
 		"messages_count": fmt.Sprintf("%d", len(messages)),
@@ -143,8 +154,23 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 
 		// Save the assistant's tool call request message to session
 		// The assistant message with tool calls needs to be preserved for conversation history
-		sess.AddMessage("assistant", "")
-		logger.Info("Added assistant tool call message to session")
+		if resp.HasToolCalls() {
+			data := map[string]interface{}{
+				"content": resp.Content(),
+				"tool_calls": resp.ToolCalls(),
+			}
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				// fallback to just content
+				sess.AddMessage("assistant", resp.Content())
+			} else {
+				sess.AddMessage("assistant", string(jsonData))
+			}
+			logger.Info("Stored assistant message with tool calls as JSON")
+		} else {
+			sess.AddMessage("assistant", resp.Content())
+			logger.Info("Added assistant response to session")
+		}
 
 		for _, call := range resp.ToolCalls() {
 			// Execute tool with span
@@ -154,15 +180,21 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 			result, err := a.toolRegistry.Execute(ctx, call.Name, call.Arguments)
 			if err != nil {
 				logger.Error(err, "tool execution failed", "tool", call.Name)
-				toolSpan.SetStatus(codes.Error, err.Error())
+				if toolSpan != nil {
+					toolSpan.SetStatus(codes.Error, err.Error())
+				}
 				// Print error in red to terminal
 				fmt.Printf("\033[91mError: %v\033[0m\n", err)
 				// Add error as tool result so LLM can see what went wrong and potentially retry
 				sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": \"Error: %v\"}", call.Name, err))
-				toolSpan.End()
+				if toolSpan != nil {
+					toolSpan.End()
+				}
 				continue
 			}
-			toolSpan.End()
+			if toolSpan != nil {
+				toolSpan.End()
+			}
 
 			// Add tool result to session
 			resultStr := fmt.Sprintf("%v", result)
@@ -189,8 +221,24 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 
 	// Add assistant response to session
 	logger.Info("Checking assistant response", "content_length", len(resp.Content()), "has_tool_calls", resp.HasToolCalls())
-	if resp.Content() != "" {
-		sess.AddMessage("assistant", resp.Content())
+	if resp.Content() != "" || resp.HasToolCalls() {
+		if resp.HasToolCalls() {
+			data := map[string]interface{}{
+				"content": resp.Content(),
+				"tool_calls": resp.ToolCalls(),
+			}
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				// fallback to just content
+				sess.AddMessage("assistant", resp.Content())
+				logger.Info("Failed to marshal assistant message with tool calls, falling back to content", "error", err)
+			} else {
+				sess.AddMessage("assistant", string(jsonData))
+				logger.Info("Stored assistant message with tool calls as JSON")
+			}
+		} else {
+			sess.AddMessage("assistant", resp.Content())
+		}
 		logger.Info("Added assistant response to session", "content", resp.Content()[:min(100, len(resp.Content()))])
 	}
 
@@ -233,6 +281,54 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 	}
 
 	for _, msg := range history {
+		if msg.Role == "assistant" {
+			// Check if the content is a JSON string with tool_calls
+			var data map[string]interface{}
+			if err := json.Unmarshal([]byte(msg.Content), &data); err == nil {
+				if toolCalls, ok := data["tool_calls"]; ok {
+					// This is an assistant message with tool calls
+					m := map[string]any{
+						"role":    msg.Role,
+						"content": data["content"],
+					}
+					if toolCalls != nil {
+						// Convert internal tool calls to LLM-expected format
+						var converted []map[string]any
+						for _, tc := range toolCalls.([]interface{}) {
+							if tcMap, ok := tc.(map[string]interface{}); ok {
+								id := tcMap["ID"]
+								name := tcMap["Name"]
+								args := tcMap["Arguments"]
+								// Ensure arguments is a JSON string
+								var argsStr string
+								if argsMap, ok := args.(map[string]interface{}); ok {
+									b, _ := json.Marshal(argsMap)
+									argsStr = string(b)
+								} else if argsStrRaw, ok := args.(string); ok {
+									argsStr = argsStrRaw
+								} else {
+									// fallback
+									b, _ := json.Marshal(args)
+									argsStr = string(b)
+								}
+								converted = append(converted, map[string]any{
+									"id":   id,
+									"type": "function",
+									"function": map[string]any{
+										"name":     name,
+										"arguments": argsStr,
+									},
+								})
+							}
+						}
+						m["tool_calls"] = converted
+					}
+					messages = append(messages, m)
+					continue
+				}
+			}
+		}
+		// Default case
 		messages = append(messages, map[string]any{
 			"role":    msg.Role,
 			"content": msg.Content,
