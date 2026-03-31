@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/dknr/bantam/channel"
 	"github.com/dknr/bantam/logging"
@@ -57,7 +56,7 @@ var runCmd = &cobra.Command{
 		// Start CLI channel with handler that processes messages
 		go func() {
 			err := cli.Start(ctx, func(ctx context.Context, sessionKey, chatID, content string) error {
-				response, stats, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
+				response, _, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
 				if err != nil {
 					logger.Error(err, "failed to process message")
 					fmt.Printf("\033[31mError: %v\033[0m\n\n", err)
@@ -66,10 +65,7 @@ var runCmd = &cobra.Command{
 
 				// Use the channel's RenderMarkdown with cached terminal width
 				fmt.Println(cli.RenderMarkdown(response))
-				// Print stats line in gray
-				fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
-				channel.PrintTokenStats(stats.Tokens, float64(stats.DurationMs), stats.Timing)
-				fmt.Println("\033[0m")
+	
 				return nil
 			})
 
