@@ -138,7 +138,9 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 	// Create tool registry
 	tr := tools.NewRegistry()
 	tr.Register(tools.NewExecTool())
-	tr.Register(tools.NewFileTool(paths.WorkspaceDir))
+	tr.Register(tools.NewViewTool(paths.WorkspaceDir))
+	tr.Register(tools.NewEditTool(paths.WorkspaceDir))
+	tr.Register(tools.NewListTool(paths.WorkspaceDir))
 	tr.Register(tools.NewTimeTool())
 	tr.Register(tools.NewEchoTool())
 	tr.Register(tools.NewGrepTool(paths.WorkspaceDir))

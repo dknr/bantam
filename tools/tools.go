@@ -90,17 +90,31 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 				"description": "The command to execute",
 			}
 			schema["required"] = []string{"command"}
-		case "file":
-			schema["properties"].(map[string]any)["action"] = map[string]any{
-				"type":        "string",
-				"description": "The action to perform: read, write, or list",
-			}
-			schema["properties"].(map[string]any)["path"] = map[string]any{
-				"type":        "string",
-				"description": "Path relative to workspace. Use relative paths only (e.g., 'file.md', 'subdir/file.txt'). Never use absolute paths.",
-			}
-			schema["description"] = "Read, write, or list files in the workspace directory. Only relative paths are allowed."
-			schema["required"] = []string{"action", "path"}
+	case "view":
+		schema["properties"].(map[string]any)["path"] = map[string]any{
+			"type":        "string",
+			"description": "Path relative to workspace. Use relative paths only (e.g., file.md, subdir/file.txt). Never use absolute paths.",
+		}
+		schema["description"] = "Read file contents from the workspace directory. Only relative paths are allowed."
+		schema["required"] = []string{"path"}
+	case "edit":
+		schema["properties"].(map[string]any)["path"] = map[string]any{
+			"type":        "string",
+			"description": "Path relative to workspace. Use relative paths only (e.g., file.md, subdir/file.txt). Never use absolute paths.",
+		}
+		schema["properties"].(map[string]any)["content"] = map[string]any{
+			"type":        "string",
+			"description": "The content to write to the file.",
+		}
+		schema["description"] = "Write content to a file in the workspace directory. Only relative paths are allowed."
+		schema["required"] = []string{"path", "content"}
+	case "list":
+		schema["properties"].(map[string]any)["path"] = map[string]any{
+			"type":        "string",
+			"description": "The path to list, relative to workspace. Defaults to \".\" (current directory).",
+		}
+		schema["description"] = "List directory contents in the workspace directory. Only relative paths are allowed."
+		// path optional, no required field
 		case "memory":
 			schema["properties"].(map[string]any)["action"] = map[string]any{
 				"type":        "string",
