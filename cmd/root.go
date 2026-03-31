@@ -142,6 +142,7 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 	tr.Register(tools.NewTimeTool())
 	tr.Register(tools.NewEchoTool())
 	tr.Register(tools.NewGrepTool(paths.WorkspaceDir))
+	tr.Register(tools.NewGitTool(paths.WorkspaceDir))
 	memoryTool, err := memory.NewMemoryTool(paths.BaseDir)
 	if err != nil {
 		logger.Error(err, "failed to initialize memory tool")

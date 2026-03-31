@@ -141,6 +141,17 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 				"description": "If true, treat the pattern as a literal string rather than a regular expression. Defaults to false.",
 			}
 			schema["required"] = []string{"pattern"}
+		case "git":
+			schema["properties"].(map[string]any)["args"] = map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Arguments to pass to the git command (e.g., ['status', '--short']). Only non-destructive subcommands are allowed.",
+			}
+			schema["properties"].(map[string]any)["path"] = map[string]any{
+				"type":        "string",
+				"description": "The working directory for the git command, relative to workspace. This parameter is required.",
+			}
+			schema["required"] = []string{"args", "path"}
 		}
 
 		defs = append(defs, map[string]any{
