@@ -127,6 +127,20 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 				"description": "Timestamp in ISO8601 format for history_since action",
 			}
 			schema["required"] = []string{"action"}
+		case "grep":
+			schema["properties"].(map[string]any)["pattern"] = map[string]any{
+				"type":        "string",
+				"description": "The pattern to search for (regex unless literal_text is true)",
+			}
+			schema["properties"].(map[string]any)["path"] = map[string]any{
+				"type":        "string",
+				"description": "The path to search, relative to workspace. Defaults to '.' (current directory).",
+			}
+			schema["properties"].(map[string]any)["literal_text"] = map[string]any{
+				"type":        "boolean",
+				"description": "If true, treat the pattern as a literal string rather than a regular expression. Defaults to false.",
+			}
+			schema["required"] = []string{"pattern"}
 		}
 
 		defs = append(defs, map[string]any{
