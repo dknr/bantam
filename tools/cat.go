@@ -9,17 +9,17 @@ import (
 )
 
 // ViewTool provides file read operations.
-type ViewTool struct {
+type CatTool struct {
 	workspace string
 }
 
 // NewViewTool creates a new view tool.
-func NewViewTool(workspace string) *ViewTool {
-	return &ViewTool{workspace: workspace}
+func NewCatTool(workspace string) *CatTool {
+	return &CatTool{workspace: workspace}
 }
 
 // validatePath ensures the resolved path is within the workspace directory.
-func (t *ViewTool) validatePath(relPath string) (string, error) {
+func (t *CatTool) validatePath(relPath string) (string, error) {
 	// Clean the path to resolve any .. or .
 	cleanPath := filepath.Clean(relPath)
 
@@ -53,18 +53,18 @@ func (t *ViewTool) validatePath(relPath string) (string, error) {
 }
 
 // Name returns the tool name.
-func (t *ViewTool) Name() string {
-	return "view"
+func (t *CatTool) Name() string {
+	return "cat"
 }
 
 // StatusLine returns a formatted status line for the view operation.
-func (t *ViewTool) StatusLine(args map[string]any) string {
+func (t *CatTool) StatusLine(args map[string]any) string {
 	path, _ := args["path"].(string)
-	return fmt.Sprintf("view> %s", path)
+	return fmt.Sprintf("cat> %s", path)
 }
 
 // Execute performs file read based on the action.
-func (t *ViewTool) Execute(ctx context.Context, args map[string]any) (any, error) {
+func (t *CatTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	relPath, ok := args["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path argument is required")

@@ -9,17 +9,17 @@ import (
 )
 
 // EditTool provides file write operations.
-type EditTool struct {
+type SedTool struct {
 	workspace string
 }
 
 // NewEditTool creates a new edit tool.
-func NewEditTool(workspace string) *EditTool {
-	return &EditTool{workspace: workspace}
+func NewSedTool(workspace string) *SedTool {
+	return &SedTool{workspace: workspace}
 }
 
 // validatePath ensures the resolved path is within the workspace directory.
-func (t *EditTool) validatePath(relPath string) (string, error) {
+func (t *SedTool) validatePath(relPath string) (string, error) {
 	// Clean the path to resolve any .. or .
 	cleanPath := filepath.Clean(relPath)
 
@@ -53,18 +53,18 @@ func (t *EditTool) validatePath(relPath string) (string, error) {
 }
 
 // Name returns the tool name.
-func (t *EditTool) Name() string {
-	return "edit"
+func (t *SedTool) Name() string {
+	return "sed"
 }
 
 // StatusLine returns a formatted status line for the edit operation.
-func (t *EditTool) StatusLine(args map[string]any) string {
+func (t *SedTool) StatusLine(args map[string]any) string {
 	path, _ := args["path"].(string)
-	return fmt.Sprintf("edit> %s", path)
+	return fmt.Sprintf("sed> %s", path)
 }
 
 // Execute performs file write based on the action.
-func (t *EditTool) Execute(ctx context.Context, args map[string]any) (any, error) {
+func (t *SedTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	relPath, ok := args["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path argument is required")

@@ -9,17 +9,17 @@ import (
 )
 
 // ListTool provides directory listing operations.
-type ListTool struct {
+type LsTool struct {
 	workspace string
 }
 
 // NewListTool creates a new list tool.
-func NewListTool(workspace string) *ListTool {
-	return &ListTool{workspace: workspace}
+func NewLsTool(workspace string) *LsTool {
+	return &LsTool{workspace: workspace}
 }
 
 // validatePath ensures the resolved path is within the workspace directory.
-func (t *ListTool) validatePath(relPath string) (string, error) {
+func (t *LsTool) validatePath(relPath string) (string, error) {
 	// Clean the path to resolve any .. or .
 	cleanPath := filepath.Clean(relPath)
 
@@ -53,21 +53,21 @@ func (t *ListTool) validatePath(relPath string) (string, error) {
 }
 
 // Name returns the tool name.
-func (t *ListTool) Name() string {
-	return "list"
+func (t *LsTool) Name() string {
+	return "ls"
 }
 
 // StatusLine returns a formatted status line for the list operation.
-func (t *ListTool) StatusLine(args map[string]any) string {
+func (t *LsTool) StatusLine(args map[string]any) string {
 	path, _ := args["path"].(string)
 	if path == "" {
 		path = "."
 	}
-	return fmt.Sprintf("list> %s", path)
+	return fmt.Sprintf("ls> %s", path)
 }
 
 // Execute performs directory listing based on the action.
-func (t *ListTool) Execute(ctx context.Context, args map[string]any) (any, error) {
+func (t *LsTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	relPath, ok := args["path"].(string)
 	if !ok {
 		relPath = "."

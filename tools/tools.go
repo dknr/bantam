@@ -84,14 +84,14 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 				"description": "The message to echo back",
 			}
 			schema["required"] = []string{"message"}
-	case "view":
+	case "cat":
 		schema["properties"].(map[string]any)["path"] = map[string]any{
 			"type":        "string",
 			"description": "Path relative to workspace. Use relative paths only (e.g., file.md, subdir/file.txt). Never use absolute paths.",
 		}
 		schema["description"] = "Read file contents from the workspace directory. Only relative paths are allowed."
 		schema["required"] = []string{"path"}
-	case "edit":
+	case "sed":
 		schema["properties"].(map[string]any)["path"] = map[string]any{
 			"type":        "string",
 			"description": "Path relative to workspace. Use relative paths only (e.g., file.md, subdir/file.txt). Never use absolute paths.",
@@ -102,7 +102,7 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 		}
 		schema["description"] = "Write content to a file in the workspace directory. Only relative paths are allowed."
 		schema["required"] = []string{"path", "content"}
-	case "list":
+	case "ls":
 		schema["properties"].(map[string]any)["path"] = map[string]any{
 			"type":        "string",
 			"description": "The path to list, relative to workspace. Defaults to \".\" (current directory).",
