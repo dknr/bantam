@@ -78,6 +78,7 @@ func (t *GitTool) Execute(ctx context.Context, args map[string]any) (any, error)
 		"show":   true,
 		"branch": true,
 		"checkout": true,
+		"clone":  true,
 		"fetch":  true,
 		"pull":   true,
 		"remote": true,
