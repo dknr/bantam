@@ -88,7 +88,8 @@ var runCmd = &cobra.Command{
 							errMsg := msg.(agent.OutputError)
 							logger.Error(errMsg.Err, "failed to process message")
 							fmt.Printf("\033[31mError: %v\033[0m\n\n", errMsg.Err)
-							return errMsg.Err
+							// Don't return error here - just continue listening for more messages
+							// return errMsg.Err
 						case agent.OutputFinalResponse:
 							final := msg.(agent.OutputFinalResponse)
 							// Use the channel's RenderMarkdown with cached terminal width
