@@ -23,7 +23,7 @@ bantam/
 ├── channel/          # Chat channel implementations (CLI, gateway)
 ├── provider/         # LLM provider interface and implementations
 ├── session/          # Session management (SQLite-backed)
-├── tools/            # Tool definitions (exec, file, time, echo)
+├── tools/            # Tool definitions (view, edit, list, time, echo, grep, git, memory)
 ├── tracing/          # OpenTelemetry integration
 └── paths/            # Path configuration constants
 ```
@@ -60,7 +60,7 @@ Key characteristics:
 
 ## Naming Conventions
 
-- **Tools**: Lowercase names (exec, file, time, echo)
+- **Tools**: Lowercase names (view, edit, list, time, echo, grep, git, memory)
 - **Structs**: `{ToolName}Tool` (ExecTool, FileTool)
 - **Methods**: Consistent signature patterns
 - **Errors**: Wrapped with context using `fmt.Errorf("...: %w", err)`

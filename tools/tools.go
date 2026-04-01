@@ -84,12 +84,6 @@ func (r *Registry) DefinitionsWithSchema() []map[string]any {
 				"description": "The message to echo back",
 			}
 			schema["required"] = []string{"message"}
-		case "exec":
-			schema["properties"].(map[string]any)["command"] = map[string]any{
-				"type":        "string",
-				"description": "The command to execute",
-			}
-			schema["required"] = []string{"command"}
 	case "view":
 		schema["properties"].(map[string]any)["path"] = map[string]any{
 			"type":        "string",
