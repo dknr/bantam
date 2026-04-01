@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
 	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
@@ -58,17 +59,50 @@ var promptCmd = &cobra.Command{
 		// Combine all args into a single message
 		message := strings.Join(args, " ")
 
-		// Process message
-		response, stats, err := ag.ProcessMessageWithStats(ctx, "cli", chatID, message)
-		if err != nil {
-			logger.Error(err, "failed to process prompt")
-			fmt.Printf("\033[31mError: %v\033[0m\n\n", err)
-			return err
+		// Start the agent
+		go ag.Start(ctx)
+
+		// Send message to agent's input channel
+		select {
+		case ag.InputChan <- message:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 
-		// Print response
-		channel.PrintResponse(response, stats.Tokens, float64(stats.DurationMs), stats.Timing)
-		return nil
+		// Wait for final response from agent's output channel
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case msg := <-ag.OutputChan:
+				// Handle different message types - we only care about final response for prompt command
+				switch msg.(type) {
+				case agent.OutputStats:
+					// Print stats line for every LLM response
+					stats := msg.(agent.OutputStats)
+					channel.PrintStatsLine(stats.Tokens, stats.DurationMs, stats.Timing)
+				case agent.OutputToolStatus:
+					// Print tool status
+					toolStatus := msg.(agent.OutputToolStatus)
+					fmt.Printf("\033[33m%s(%v)\033[0m\n", toolStatus.ToolName, toolStatus.Args)
+				case agent.OutputIntermediateResponse:
+					// Print intermediate response
+					intermediate := msg.(agent.OutputIntermediateResponse)
+					fmt.Printf("\033[36m> %s\033[0m\n", intermediate.Content)
+				case agent.OutputError:
+					// Print error
+					errMsg := msg.(agent.OutputError)
+					logger.Error(errMsg.Err, "failed to process prompt")
+					fmt.Printf("\033[31mError: %v\033[0m\n\n", errMsg.Err)
+					return errMsg.Err
+				case agent.OutputFinalResponse:
+					// Print final response
+					final := msg.(agent.OutputFinalResponse)
+					channel.PrintResponse(final.Content, nil, 0, nil) // We don't have stats/timing here, but the print function can handle nil
+					return nil
+				}
+			}
+		}
 	},
 }
 

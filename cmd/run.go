@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
 	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
@@ -53,20 +54,49 @@ var runCmd = &cobra.Command{
 		// Create CLI channel
 		cli := channel.NewCLIChannelWithWidth(sessions, sessionKey, termWidth)
 
+		// Start the agent
+		go ag.Start(ctx)
+
 		// Start CLI channel with handler that processes messages
 		go func() {
 			err := cli.Start(ctx, func(ctx context.Context, sessionKey, chatID, content string) error {
-				response, _, err := ag.ProcessMessageWithStats(ctx, cli.Name(), chatID, content)
-				if err != nil {
-					logger.Error(err, "failed to process message")
-					fmt.Printf("\033[31mError: %v\033[0m\n\n", err)
-					return err
+				// Send message to agent's input channel
+				select {
+				case ag.InputChan <- content:
+				case <-ctx.Done():
+					return ctx.Err()
 				}
 
-				// Use the channel's RenderMarkdown with cached terminal width
-				fmt.Println(cli.RenderMarkdown(response))
-	
-				return nil
+				// Wait for response from agent's output channel
+				for {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case msg := <-ag.OutputChan:
+						// Handle different message types
+						switch msg.(type) {
+						case agent.OutputStats:
+							stats := msg.(agent.OutputStats)
+							channel.PrintStatsLine(stats.Tokens, stats.DurationMs, stats.Timing)
+						case agent.OutputToolStatus:
+							toolStatus := msg.(agent.OutputToolStatus)
+							fmt.Printf("\033[33m%s(%v)\033[0m\n", toolStatus.ToolName, toolStatus.Args)
+						case agent.OutputIntermediateResponse:
+							intermediate := msg.(agent.OutputIntermediateResponse)
+							fmt.Printf("\033[36m> %s\033[0m\n", intermediate.Content)
+						case agent.OutputError:
+							errMsg := msg.(agent.OutputError)
+							logger.Error(errMsg.Err, "failed to process message")
+							fmt.Printf("\033[31mError: %v\033[0m\n\n", errMsg.Err)
+							return errMsg.Err
+						case agent.OutputFinalResponse:
+							final := msg.(agent.OutputFinalResponse)
+							// Use the channel's RenderMarkdown with cached terminal width
+							fmt.Println(cli.RenderMarkdown(final.Content))
+							return nil
+						}
+					}
+				}
 			})
 
 			if err != nil {

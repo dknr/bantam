@@ -16,6 +16,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
+	"strings"
 )
 
 var (
@@ -152,8 +153,16 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 		tr.Register(memoryTool)
 	}
 
-	// Create agent
-	return agent.New(p, tr, sessions), memoryTool, nil
+	// Create agent with channel-based communication
+	// Extract channel and chatID from sessionKey (format: channel:chatID)
+	sessionKey := sessionKey
+	channel := "cli"
+	chatID := sessionKey
+	if idx := strings.Index(chatID, ":"); idx != -1 {
+		channel = chatID[:idx]
+		chatID = chatID[idx+1:]
+	}
+	return agent.New(p, tr, sessions, channel, chatID), memoryTool, nil
 }
 
 // getCLIChannel creates and returns a CLI channel

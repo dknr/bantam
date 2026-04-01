@@ -19,12 +19,66 @@ import (
 	"github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
 	"github.com/dknr/bantam/tracing"
-	channelpkg "github.com/dknr/bantam/channel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"github.com/go-logr/logr"
 )
 
+// OutputMessageType represents the type of output message.
+type OutputMessageType int
+
+const (
+	OutputStatsType OutputMessageType = iota
+	OutputToolStatusType
+	OutputIntermediateResponseType
+	OutputErrorType
+	OutputFinalResponseType
+)
+
+// OutputMessage is the interface for all output messages from the agent.
+type OutputMessage interface {
+	Type() OutputMessageType
+}
+
+// OutputStats contains timing and token information.
+type OutputStats struct {
+	Tokens     map[string]int
+	DurationMs float64
+	Timing     interface{}
+}
+
+func (OutputStats) Type() OutputMessageType { return OutputStatsType }
+
+// OutputToolStatus represents the status of a tool execution.
+type OutputToolStatus struct {
+	ToolName string
+	Args     map[string]any
+}
+
+func (OutputToolStatus) Type() OutputMessageType { return OutputToolStatusType }
+
+// OutputIntermediateResponse represents an intermediate response from the LLM.
+type OutputIntermediateResponse struct {
+	Content string
+}
+
+func (OutputIntermediateResponse) Type() OutputMessageType { return OutputIntermediateResponseType }
+
+// OutputError represents an error that occurred during processing.
+type OutputError struct {
+	Err error
+}
+
+func (OutputError) Type() OutputMessageType { return OutputErrorType }
+
+// OutputFinalResponse represents the final response from the agent.
+type OutputFinalResponse struct {
+	Content string
+}
+
+func (OutputFinalResponse) Type() OutputMessageType { return OutputFinalResponseType }
+
+// loadSystemPrompt loads the system prompt from soul.md or returns a fallback.
 func loadSystemPrompt(logger logr.Logger, workspaceDir string) string {
 	soulPath := filepath.Join(workspaceDir, "soul.md")
 	if data, err := os.ReadFile(soulPath); err == nil {
@@ -37,49 +91,54 @@ func loadSystemPrompt(logger logr.Logger, workspaceDir string) string {
 	return fallback
 }
 
-// Agent is the core agent instance.
+// Agent is the core agent instance that communicates via channels.
 type Agent struct {
 	provider     provider.Provider
 	toolRegistry *tools.Registry
 	sessionMgr   *session.Manager
+	InputChan    chan string      // Only message content
+	OutputChan   chan OutputMessage
+	channel      string           // Fixed per agent (e.g., "cli")
+	chatID       string           // Fixed per agent
 }
 
-// New creates a new Agent instance.
-func New(p provider.Provider, tools *tools.Registry, sessions *session.Manager) *Agent {
+// New creates a new Agent instance with channel-based communication.
+func New(p provider.Provider, tools *tools.Registry, sessions *session.Manager, channel, chatID string) *Agent {
 	return &Agent{
 		provider:     p,
 		toolRegistry: tools,
 		sessionMgr:   sessions,
+		InputChan:    make(chan string, 10),
+		OutputChan:   make(chan OutputMessage, 10),
+		channel:      channel,
+		chatID:       chatID,
 	}
 }
 
-// ProcessStats contains timing and token information.
-type ProcessStats struct {
-	DurationMs int
-	Tokens     map[string]int
-	Timing     interface{} // Provider timing data (map from API response)
+// Start begins the agent loop, reading from inputChan and writing to outputChan.
+// The loop runs until the provided context is cancelled.
+func (a *Agent) Start(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-a.InputChan:
+			if !ok {
+				return
+			}
+			// Process the message (this is the core agent logic)
+			a.processMessageWithTiming(ctx, msg)
+		}
+	}
 }
 
-// ProcessMessage handles a single message from any source (CLI, gateway, etc.).
-//
-// This is the UNIFIED message handler - all messages flow through here,
-// ensuring consistent OpenTelemetry tracing regardless of channel.
-func (a *Agent) ProcessMessage(ctx context.Context, channel, chatID, content string) (string, error) {
-	content, _, err := a.processMessageWithTiming(ctx, channel, chatID, content)
-	return content, err
-}
-
-// ProcessMessageWithStats handles a single message and returns timing/token stats.
-func (a *Agent) ProcessMessageWithStats(ctx context.Context, channel, chatID, content string) (string, ProcessStats, error) {
-	return a.processMessageWithTiming(ctx, channel, chatID, content)
-}
-
-// processMessageWithTiming is the internal implementation that handles both methods.
-func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, content string) (string, ProcessStats, error) {
+// processMessageWithTiming is the internal implementation that handles message processing.
+// It sends output messages to the output channel instead of returning values.
+func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 	// Create span for this message (unified for all sources)
 	ctx, processSpan := tracing.StartActiveSpan(ctx, "process_message", map[string]string{
-		"channel":   channel,
-		"chat_id":   chatID,
+		"channel":   a.channel,
+		"chat_id":   a.chatID,
 		"operation": "receive",
 	})
 	if processSpan != nil {
@@ -87,21 +146,21 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 	}
 
 	logger := logging.FromContext(ctx)
-	logger.Info("Processing message", "channel", channel, "chat_id", chatID)
+	logger.Info("Processing message", "channel", a.channel, "chat_id", a.chatID)
 
 	// Log request in verbose mode
 	if logging.IsVerbose(ctx) {
 		reqData := map[string]any{
-			"channel":     channel,
-			"chat_id":     chatID,
+			"channel":     a.channel,
+			"chat_id":     a.chatID,
 			"content":     content,
-			"session_key": fmt.Sprintf("%s:%s", channel, chatID),
+			"session_key": fmt.Sprintf("%s:%s", a.channel, a.chatID),
 		}
 		logging.PrintJSON("Request", reqData)
 	}
 
 	// Build session key (统一 session key 格式)
-	sessionKey := fmt.Sprintf("%s:%s", channel, chatID)
+	sessionKey := fmt.Sprintf("%s:%s", a.channel, a.chatID)
 
 	// Load or create session for this conversation
 	sess := a.sessionMgr.GetOrCreate(sessionKey)
@@ -115,7 +174,6 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 
 	var tokens map[string]int
 	var durationMs int64
-	var timing interface{}
 	var responseContent string
 	firstIteration := true
 
@@ -127,10 +185,10 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 		logger.Info("calling LLM", "messages_count", len(messages))
 		if logging.IsVerbose(ctx) {
 			reqData := map[string]any{
-				"channel":     channel,
-				"chat_id":     chatID,
+				"channel":     a.channel,
+				"chat_id":     a.chatID,
 				"content":     content,
-				"session_key": fmt.Sprintf("%s:%s", channel, chatID),
+				"session_key": fmt.Sprintf("%s:%s", a.channel, a.chatID),
 				"messages":    messages,
 			}
 			logging.PrintJSON("Request", reqData)
@@ -146,7 +204,13 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 				chatSpan.End()
 			}
 			logger.Error(err, "LLM chat failed")
-			return "", ProcessStats{}, fmt.Errorf("LLM error: %w", err)
+			// Send error to output channel
+			select {
+			case a.OutputChan <- OutputError{Err: fmt.Errorf("LLM error: %w", err)}:
+			case <-ctx.Done():
+				return
+			}
+			return
 		}
 		if chatSpan != nil {
 			chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(resp.HasToolCalls())))
@@ -154,46 +218,66 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 			chatSpan.End()
 		}
 		durationMsTmp := time.Since(startTime).Milliseconds()
-	callTokens := resp.TokenDetails()
-	callTiming := resp.Timing()
+		callTokens := resp.TokenDetails()
+		callTiming := resp.Timing()
 		if firstIteration {
 			durationMs = durationMsTmp
 			firstIteration = false
 		}
 		logger.Info("LLM response received", "has_tool_calls", resp.HasToolCalls(), "content_length", len(resp.Content()), "duration_ms", durationMsTmp)
 
-		// Print stats line for every LLM response
-		channelpkg.PrintStatsLine(callTokens, float64(durationMsTmp), callTiming)
+		// Print stats line for every LLM response (send to output channel)
+		select {
+		case a.OutputChan <- OutputStats{
+			Tokens:     callTokens,
+			DurationMs: float64(durationMsTmp),
+			Timing:     callTiming,
+		}:
+		case <-ctx.Done():
+			return
+		}
 
 		// Print intermediate response (cyan with indent) if there's content and there are more tool calls coming
-		// If no more tool calls, this is the final response which printResponse will handle
+		// If no more tool calls, this is the final response which will be sent separately
 		if resp.Content() != "" && resp.HasToolCalls() {
-			fmt.Printf("\033[36m> %s\033[0m\n", resp.Content())
+			select {
+			case a.OutputChan <- OutputIntermediateResponse{
+				Content: resp.Content(),
+			}:
+			case <-ctx.Done():
+				return
+			}
 		}
 
 		if !resp.HasToolCalls() {
 			// Final response
 			responseContent = resp.Content()
 			tokens = resp.TokenDetails()
-			timing = resp.Timing()
 			break
 		}
 
 		// Handle tool calls
-		// Print tool calls with status lines if available
-		for _, call := range resp.ToolCalls() {
-			tool, exists := a.toolRegistry.Get(call.Name)
-			if exists {
-				// Check if tool implements StatusLine
-				if statusTool, ok := tool.(tools.StatusLineTool); ok {
-					fmt.Printf("\033[33m%s\033[0m\n", statusTool.StatusLine(call.Arguments))
+			for _, call := range resp.ToolCalls() {
+				if _, exists := a.toolRegistry.Get(call.Name); exists {
+					select {
+					case a.OutputChan <- OutputToolStatus{
+						ToolName: call.Name,
+						Args:     call.Arguments,
+					}:
+					case <-ctx.Done():
+						return
+					}
 				} else {
-					fmt.Printf("\033[33m%s(%v)\033[0m\n", call.Name, call.Arguments)
+					select {
+					case a.OutputChan <- OutputToolStatus{
+						ToolName: call.Name,
+						Args:     call.Arguments,
+					}:
+					case <-ctx.Done():
+						return
+					}
 				}
-			} else {
-				fmt.Printf("\033[33m%s(%v)\033[0m\n", call.Name, call.Arguments)
 			}
-		}
 
 		// Save the assistant's tool call request message to session
 		// The assistant message with tool calls needs to be preserved for conversation history
@@ -226,8 +310,15 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 				if toolSpan != nil {
 					toolSpan.SetStatus(codes.Error, err.Error())
 				}
-				// Print error in red to terminal
-				fmt.Printf("\033[91mError: %v\033[0m\n", err)
+				// Print error in red to terminal (send to output channel)
+				select {
+				case a.OutputChan <- OutputError{Err: fmt.Errorf("tool %s failed: %w", call.Name, err)}:
+				case <-ctx.Done():
+					if toolSpan != nil {
+						toolSpan.End()
+					}
+					return
+				}
 				// Add error as tool result so LLM can see what went wrong and potentially retry
 				sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": \"Error: %v\"}", call.Name, err))
 				if toolSpan != nil {
@@ -268,7 +359,14 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, channel, chatID, c
 		logging.PrintJSON("Response", respData)
 	}
 
-	return responseContent, ProcessStats{DurationMs: int(durationMs), Tokens: tokens, Timing: timing}, nil
+	// Send final response to output channel
+	select {
+	case a.OutputChan <- OutputFinalResponse{
+		Content: responseContent,
+	}:
+	case <-ctx.Done():
+		return
+	}
 }
 
 // buildMessages constructs the message history for the LLM.
@@ -278,7 +376,6 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 	// Build messages array
 	messages := make([]map[string]any, 0, len(history)+1)
 
-	
 	for _, msg := range history {
 		if msg.Role == "assistant" {
 			// Check if the content is a JSON string with tool_calls
@@ -348,4 +445,7 @@ func boolToInt(b bool) int {
 // Close closes the agent and any resources it holds.
 func (a *Agent) Close() {
 	// Memory tool is closed by the caller (cmd/root.go)
+	// Close channels to prevent goroutine leaks
+	close(a.InputChan)
+	close(a.OutputChan)
 }
