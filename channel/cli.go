@@ -305,7 +305,10 @@ const customDarkStyle = `{
 // Returns plain text fallback on error.
 // Uses the CLIChannel's cached terminal width if available, otherwise uses static detection.
 func (c *CLIChannel) RenderMarkdown(text string) string {
-	width := c.getTerminalWidthStatic()
+	width := c.termWidth
+	if width <= 0 {
+		width = getTerminalWidthStatic()
+	}
 
 	// Create glamour renderer with custom dark style (no margins)
 	r, err := glamour.NewTermRenderer(
@@ -420,14 +423,6 @@ func printTokenStats(tokens map[string]int, durationMs float64, timing interface
 	}
 
 	fmt.Printf("%d => %d => %d tokens (%.1fs)", inputTokens, outputTokens, totalTokens, durationMs/1000)
-}
-
-// getTerminalWidthStatic attempts to get the terminal width, returns 80 on error.
-func (c *CLIChannel) getTerminalWidthStatic() int {
-	if c.termWidth > 0 {
-		return c.termWidth
-	}
-	return getTerminalWidthStatic()
 }
 
 // getTerminalWidthStatic attempts to get the terminal width, returns 80 on error.
