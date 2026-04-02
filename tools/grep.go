@@ -20,41 +20,6 @@ func NewGrepTool(workspace string) *GrepTool {
 	return &GrepTool{workspace: workspace}
 }
 
-// validatePath ensures the resolved path is within the workspace directory.
-// This is the same validation used by the FileTool.
-func (t *GrepTool) validatePath(relPath string) (string, error) {
-	// Clean the path to resolve any .. or .
-	cleanPath := filepath.Clean(relPath)
-
-	// Join with workspace and get absolute path
-	absPath := filepath.Join(t.workspace, cleanPath)
-
-	// Get absolute path of workspace
-	absWorkspace, err := filepath.Abs(t.workspace)
-	if err != nil {
-		return "", fmt.Errorf("invalid workspace: %w", err)
-	}
-
-	// Get absolute path of the target
-	absTarget, err := filepath.Abs(absPath)
-	if err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
-	}
-
-	// Check if target is within workspace using filepath.Rel
-	rel, err := filepath.Rel(absWorkspace, absTarget)
-	if err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
-	}
-
-	// If the relative path starts with .., it's outside the workspace
-	if strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("path traversal not allowed: %s", relPath)
-	}
-
-	return absPath, nil
-}
-
 // Name returns the tool name.
 func (t *GrepTool) Name() string {
 	return "grep"
@@ -87,7 +52,7 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (any, error
 	literalText, _ := args["literal_text"].(bool)
 
 	// Validate the path
-	absPath, err := t.validatePath(path)
+	absPath, err := ValidatePath(t.workspace, path)
 	if err != nil {
 		return "", err
 	}

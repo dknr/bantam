@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -112,31 +111,16 @@ func (t *GitTool) Execute(ctx context.Context, args map[string]any) (any, error)
 		return "", fmt.Errorf("path must be a string")
 	}
 
-	// Determine working directory
-	workDir := t.workspaceDir
-	if pathArg != "" {
-		// Join with workspaceDir and clean
-		workDir = filepath.Join(t.workspaceDir, pathArg)
-		// Ensure the path is within the workspace
-		absWorkDir, err := filepath.Abs(workDir)
-		if err != nil {
-			return "", fmt.Errorf("failed to get absolute path: %w", err)
-		}
-		absWorkspace, err := filepath.Abs(t.workspaceDir)
-		if err != nil {
-			return "", fmt.Errorf("failed to get absolute workspace path: %w", err)
-		}
-		if !strings.HasPrefix(absWorkDir, absWorkspace) {
-			return "", fmt.Errorf("path %q is outside the workspace", pathArg)
-		}
-		workDir = absWorkDir
+	// Determine working directory using ValidatePath
+	absPath, err := ValidatePath(t.workspaceDir, pathArg)
+	if err != nil {
+		return "", err
 	}
-	// If pathArg is empty string, we keep workDir as t.workspaceDir (which is the workspace root)
 
 	// Prepare command: git <args>
 	cmdArgs := append([]string{"git"}, argv...)
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-	cmd.Dir = workDir
+	cmd.Dir = absPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("git command failed: %w", err)

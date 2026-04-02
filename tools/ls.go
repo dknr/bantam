@@ -18,40 +18,6 @@ func NewLsTool(workspace string) *LsTool {
 	return &LsTool{workspace: workspace}
 }
 
-// validatePath ensures the resolved path is within the workspace directory.
-func (t *LsTool) validatePath(relPath string) (string, error) {
-	// Clean the path to resolve any .. or .
-	cleanPath := filepath.Clean(relPath)
-
-	// Join with workspace and get absolute path
-	absPath := filepath.Join(t.workspace, cleanPath)
-
-	// Get absolute path of workspace
-	absWorkspace, err := filepath.Abs(t.workspace)
-	if err != nil {
-		return "", fmt.Errorf("invalid workspace: %w", err)
-	}
-
-	// Get absolute path of the target
-	absTarget, err := filepath.Abs(absPath)
-	if err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
-	}
-
-	// Check if target is within workspace using filepath.Rel
-	rel, err := filepath.Rel(absWorkspace, absTarget)
-	if err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
-	}
-
-	// If the relative path starts with .., it's outside the workspace
-	if strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("path traversal not allowed: %s", relPath)
-	}
-
-	return absPath, nil
-}
-
 // Name returns the tool name.
 func (t *LsTool) Name() string {
 	return "ls"
@@ -78,7 +44,7 @@ func (t *LsTool) Execute(ctx context.Context, args map[string]any) (any, error) 
 		return "", fmt.Errorf("paths must be relative to the workspace directory. Use relative paths like 'file.md' instead of absolute paths.")
 	}
 
-	absPath, err := t.validatePath(relPath)
+	absPath, err := ValidatePath(t.workspace, relPath)
 	if err != nil {
 		return "", err
 	}
