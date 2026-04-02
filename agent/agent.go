@@ -183,28 +183,8 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 		messages := a.buildMessages(sess)
 
 		// Call LLM with timing
-		logger.Info("calling LLM", "messages_count", len(messages))
-		if logging.IsVerbose(ctx) {
-			reqData := map[string]any{
-				"channel":     a.channel,
-				"chat_id":     a.chatID,
-				"content":     content,
-				"session_key": fmt.Sprintf("%s:%s", a.channel, a.chatID),
-				"messages":    messages,
-			}
-			logging.PrintJSON("Request", reqData)
-		}
-		startTime := time.Now()
-		ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.chat", map[string]string{
-			"messages_count": fmt.Sprintf("%d", len(messages)),
-		})
-		resp, err := a.provider.Chat(ctx, messages, a.toolRegistry.DefinitionsWithSchema())
+		resp, err, callDurationMs, callTokens, callTiming := a.callLLMWithTiming(ctx, messages, logger)
 		if err != nil {
-			if chatSpan != nil {
-				chatSpan.SetStatus(codes.Error, err.Error())
-				chatSpan.End()
-			}
-			logger.Error(err, "LLM chat failed")
 			// Send error to output channel
 			select {
 			case a.OutputChan <- OutputError{Err: fmt.Errorf("LLM error: %w", err)}:
@@ -213,131 +193,33 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 			}
 			return
 		}
-		if chatSpan != nil {
-			chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", util.BoolToInt(resp.HasToolCalls())))
-			chatSpan.SetAttributes(attribute.Int("response.content_length", len(resp.Content())))
-			chatSpan.End()
-		}
-		durationMsTmp := time.Since(startTime).Milliseconds()
-		callTokens := resp.TokenDetails()
-		callTiming := resp.Timing()
-		if firstIteration {
-			durationMs = durationMsTmp
-			firstIteration = false
-		}
-		logger.Info("LLM response received", "has_tool_calls", resp.HasToolCalls(), "content_length", len(resp.Content()), "duration_ms", durationMsTmp)
 
-		// Print stats line for every LLM response (send to output channel)
-		select {
-		case a.OutputChan <- OutputStats{
-			Tokens:     callTokens,
-			DurationMs: float64(durationMsTmp),
-			Timing:     callTiming,
-		}:
-		case <-ctx.Done():
-			return
-		}
+		// Handle LLM response output (stats and intermediate response)
+		a.handleLLMResponseOutput(ctx, resp, callDurationMs, callTokens, callTiming, logger)
 
-		// Print intermediate response (cyan with indent) if there's content and there are more tool calls coming
-		// If no more tool calls, this is the final response which will be sent separately
-		if resp.Content() != "" && resp.HasToolCalls() {
-			select {
-			case a.OutputChan <- OutputIntermediateResponse{
-				Content: resp.Content(),
-			}:
-			case <-ctx.Done():
-				return
-			}
-		}
+		// Store assistant message in session
+		a.storeAssistantMessage(sess, resp, logger)
 
 		if !resp.HasToolCalls() {
 			// Final response
 			responseContent = resp.Content()
-			tokens = resp.TokenDetails()
+			tokens = callTokens
+			// durationMs is already set from first iteration (or remains 0 if no iterations, but there's always at least one)
 			break
 		}
 
 		// Handle tool calls
-			for _, call := range resp.ToolCalls() {
-				if _, exists := a.toolRegistry.Get(call.Name); exists {
-					select {
-					case a.OutputChan <- OutputToolStatus{
-						ToolName: call.Name,
-						Args:     call.Arguments,
-					}:
-					case <-ctx.Done():
-						return
-					}
-				} else {
-					select {
-					case a.OutputChan <- OutputToolStatus{
-						ToolName: call.Name,
-						Args:     call.Arguments,
-					}:
-					case <-ctx.Done():
-						return
-					}
-				}
-			}
-
-		// Save the assistant's tool call request message to session
-		// The assistant message with tool calls needs to be preserved for conversation history
-		if resp.HasToolCalls() {
-			data := map[string]interface{}{
-				"content": resp.Content(),
-				"tool_calls": resp.ToolCalls(),
-			}
-			jsonData, err := json.Marshal(data)
-			if err != nil {
-				// fallback to just content
-				sess.AddMessage("assistant", resp.Content())
-			} else {
-				sess.AddMessage("assistant", string(jsonData))
-			}
-			logger.Info("Stored assistant message with tool calls as JSON")
-		} else {
-			sess.AddMessage("assistant", resp.Content())
-			logger.Info("Added assistant response to session")
-		}
-
-		for _, call := range resp.ToolCalls() {
-			// Execute tool with span
-			ctx, toolSpan := tracing.StartActiveSpan(ctx, "tool.execute", map[string]string{
-				"tool.name": call.Name,
-			})
-			result, err := a.toolRegistry.Execute(ctx, call.Name, call.Arguments)
-			if err != nil {
-				logger.Error(err, "tool execution failed", "tool", call.Name)
-				if toolSpan != nil {
-					toolSpan.SetStatus(codes.Error, err.Error())
-				}
-				// Print error in red to terminal (send to output channel)
-				select {
-				case a.OutputChan <- OutputError{Err: fmt.Errorf("tool %s failed: %w", call.Name, err)}:
-				case <-ctx.Done():
-					if toolSpan != nil {
-						toolSpan.End()
-					}
-					return
-				}
-				// Add error as tool result so LLM can see what went wrong and potentially retry
-				sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": \"Error: %v\"}", call.Name, err))
-				if toolSpan != nil {
-					toolSpan.End()
-				}
-				continue
-			}
-			if toolSpan != nil {
-				toolSpan.End()
-			}
-
-			// Add tool result to session
-			resultStr := fmt.Sprintf("%v", result)
-			sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": %s}", call.Name, resultStr))
+		a.executeToolCallsAndUpdateSession(ctx, resp.ToolCalls(), sess, logger)
+		
+		// Set durationMs only on first iteration
+		if firstIteration {
+			durationMs = callDurationMs
+			firstIteration = false
 		}
 	}
 
-	// Add assistant response to session (final response)
+	// Add assistant response to session (final response) - already stored in storeAssistantMessage when !HasToolCalls
+	// But we need to make sure it's stored. Actually, storeAssistantMessage was called above, so it's already done.
 	logger.Info("Checking assistant response", "content_length", len(responseContent), "has_tool_calls", false)
 	if responseContent != "" {
 		sess.AddMessage("assistant", responseContent)
@@ -433,6 +315,150 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 	}
 
 	return messages
+}
+
+// callLLMWithTiming calls the LLM provider with timing and tracing.
+func (a *Agent) callLLMWithTiming(ctx context.Context, messages []map[string]any, logger logr.Logger) (*provider.Response, error, int64, map[string]int, interface{}) {
+	// Call LLM with timing
+	logger.Info("calling LLM", "messages_count", len(messages))
+	if logging.IsVerbose(ctx) {
+		reqData := map[string]any{
+			"channel":     a.channel,
+			"chat_id":     a.chatID,
+			"session_key": fmt.Sprintf("%s:%s", a.channel, a.chatID),
+			"messages":    messages,
+		}
+		logging.PrintJSON("Request", reqData)
+	}
+	startTime := time.Now()
+	ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.chat", map[string]string{
+		"messages_count": fmt.Sprintf("%d", len(messages)),
+	})
+	resp, err := a.provider.Chat(ctx, messages, a.toolRegistry.DefinitionsWithSchema())
+	if err != nil {
+		if chatSpan != nil {
+			chatSpan.SetStatus(codes.Error, err.Error())
+			chatSpan.End()
+		}
+		logger.Error(err, "LLM chat failed")
+		return nil, err, 0, nil, nil
+	}
+	if chatSpan != nil {
+		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", util.BoolToInt(resp.HasToolCalls())))
+		chatSpan.SetAttributes(attribute.Int("response.content_length", len(resp.Content())))
+		chatSpan.End()
+	}
+	durationMs := time.Since(startTime).Milliseconds()
+	callTokens := resp.TokenDetails()
+	callTiming := resp.Timing()
+	logger.Info("LLM response received", "has_tool_calls", resp.HasToolCalls(), "content_length", len(resp.Content()), "duration_ms", durationMs)
+	return resp, nil, durationMs, callTokens, callTiming
+}
+
+// handleLLMResponseOutput sends stats and intermediate response based on LLM response.
+func (a *Agent) handleLLMResponseOutput(ctx context.Context, resp *provider.Response, durationMs int64, callTokens map[string]int, callTiming interface{}, logger logr.Logger) {
+	// Send stats line for every LLM response (send to output channel)
+	select {
+	case a.OutputChan <- OutputStats{
+		Tokens:     callTokens,
+		DurationMs: float64(durationMs),
+		Timing:     callTiming,
+	}:
+	case <-ctx.Done():
+		return
+	}
+
+	// Print intermediate response (cyan with indent) if there's content and there are more tool calls coming
+	// If no more tool calls, this is the final response which will be sent separately
+	if resp.Content() != "" && resp.HasToolCalls() {
+		select {
+		case a.OutputChan <- OutputIntermediateResponse{
+			Content: resp.Content(),
+		}:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// executeToolCallsAndUpdateSession executes tool calls and updates the session with results.
+func (a *Agent) executeToolCallsAndUpdateSession(ctx context.Context, toolCalls []provider.ToolCall, sess *session.Session, logger logr.Logger) {
+	for _, call := range toolCalls {
+		if _, exists := a.toolRegistry.Get(call.Name); exists {
+			select {
+			case a.OutputChan <- OutputToolStatus{
+				ToolName: call.Name,
+				Args:     call.Arguments,
+			}:
+			case <-ctx.Done():
+				return
+			}
+		} else {
+			select {
+			case a.OutputChan <- OutputToolStatus{
+				ToolName: call.Name,
+				Args:     call.Arguments,
+			}:
+			case <-ctx.Done():
+				return
+			}
+		}
+
+		// Execute tool with span
+		ctx, toolSpan := tracing.StartActiveSpan(ctx, "tool.execute", map[string]string{
+			"tool.name": call.Name,
+		})
+		result, err := a.toolRegistry.Execute(ctx, call.Name, call.Arguments)
+		if err != nil {
+			logger.Error(err, "tool execution failed", "tool", call.Name)
+			if toolSpan != nil {
+				toolSpan.SetStatus(codes.Error, err.Error())
+			}
+			// Print error in red to terminal (send to output channel)
+			select {
+			case a.OutputChan <- OutputError{Err: fmt.Errorf("tool %s failed: %w", call.Name, err)}:
+			case <-ctx.Done():
+				if toolSpan != nil {
+					toolSpan.End()
+				}
+				return
+			}
+			// Add error as tool result so LLM can see what went wrong and potentially retry
+			sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": \"Error: %v\"}", call.Name, err))
+			if toolSpan != nil {
+				toolSpan.End()
+			}
+			continue
+		}
+		if toolSpan != nil {
+			toolSpan.End()
+		}
+
+		// Add tool result to session
+		resultStr := fmt.Sprintf("%v", result)
+		sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": %s}", call.Name, resultStr))
+	}
+}
+
+// storeAssistantMessage stores the assistant message in the session.
+func (a *Agent) storeAssistantMessage(sess *session.Session, resp *provider.Response, logger logr.Logger) {
+	if resp.HasToolCalls() {
+		data := map[string]interface{}{
+			"content": resp.Content(),
+			"tool_calls": resp.ToolCalls(),
+		}
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			// fallback to just content
+			sess.AddMessage("assistant", resp.Content())
+		} else {
+			sess.AddMessage("assistant", string(jsonData))
+		}
+		logger.Info("Stored assistant message with tool calls as JSON")
+	} else {
+		sess.AddMessage("assistant", resp.Content())
+		logger.Info("Added assistant response to session")
+	}
 }
 
 
