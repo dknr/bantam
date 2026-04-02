@@ -10,6 +10,7 @@ import (
 
 	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/tracing"
+	"github.com/dknr/bantam/util"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 )
@@ -214,20 +215,14 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, to
 		chatSpan.SetAttributes(attribute.Int("llm.token.prompt", tokens["prompt"]))
 		chatSpan.SetAttributes(attribute.Int("llm.token.completion", tokens["completion"]))
 		chatSpan.SetAttributes(attribute.Int("llm.token.total", tokens["total"]))
-		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(len(toolCalls) > 0)))
+		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", util.BoolToInt(len(toolCalls) > 0)))
 		chatSpan.SetAttributes(attribute.Int("response.content_length", len(content)))
 		chatSpan.End()
 	}
 	return llmResponse, nil
 }
 
-// boolToInt converts bool to int for OpenTelemetry attributes.
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
+
 
 // GetDefaultModel returns the default model.
 func (p *OpenAIProvider) GetDefaultModel() string {

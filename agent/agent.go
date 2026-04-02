@@ -16,6 +16,7 @@ import (
 	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
 	"github.com/dknr/bantam/provider"
+	"github.com/dknr/bantam/util"
 	"github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
 	"github.com/dknr/bantam/tracing"
@@ -213,7 +214,7 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 			return
 		}
 		if chatSpan != nil {
-			chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", boolToInt(resp.HasToolCalls())))
+			chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", util.BoolToInt(resp.HasToolCalls())))
 			chatSpan.SetAttributes(attribute.Int("response.content_length", len(resp.Content())))
 			chatSpan.End()
 		}
@@ -434,13 +435,7 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 	return messages
 }
 
-// boolToInt converts bool to int for OpenTelemetry attributes.
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
+
 
 // Close closes the agent and any resources it holds.
 func (a *Agent) Close() {
