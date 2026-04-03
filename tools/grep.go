@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -128,24 +129,40 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (any, error
 		}
 	}
 
-	if len(matches) == 0 {
-		return "No matches found.", nil
-	}
+	var result string
+		if len(matches) == 0 {
+			result = "No matches found."
+		} else {
+			// Sort matches by file path and line number
+			sort.Slice(matches, func(i, j int) bool {
+				if matches[i].file != matches[j].file {
+					return matches[i].file < matches[j].file
+				}
+				return matches[i].line < matches[j].line
+			})
 
-	// Sort matches by file path and line number
-	sort.Slice(matches, func(i, j int) bool {
-		if matches[i].file != matches[j].file {
-			return matches[i].file < matches[j].file
+			// Format the results
+			var resultLines []string
+			for _, m := range matches {
+				resultLines = append(resultLines, fmt.Sprintf("%s:%d:%s", m.file, m.line, m.content))
+			}
+			result = strings.Join(resultLines, "\n")
 		}
-		return matches[i].line < matches[j].line
-	})
 
-	// Format the results
-	var resultLines []string
-	for _, m := range matches {
-		resultLines = append(resultLines, fmt.Sprintf("%s:%d:%s", m.file, m.line, m.content))
-	}
-	return strings.Join(resultLines, "\n"), nil
+		// Apply 8kB limit
+		const maxOutputSize = 8192
+		if len([]byte(result)) > maxOutputSize {
+			resultBytes := []byte(result)
+			truncated := resultBytes[:maxOutputSize]
+			lastNewline := bytes.LastIndex(truncated, []byte{'\n'})
+			if lastNewline == -1 {
+				result = string(truncated) + "\n[Output truncated to 8kB]"
+			} else {
+				result = string(truncated[:lastNewline]) + "\n[Output truncated to 8kB]"
+			}
+		}
+
+		return result, nil
 }
 
 // searchFile searches a single file for the pattern.
