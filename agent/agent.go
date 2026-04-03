@@ -218,12 +218,6 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 		}
 	}
 
-	// Add assistant response to session (final response) - already stored in storeAssistantMessage when !HasToolCalls
-	// But we need to make sure it's stored. Actually, storeAssistantMessage was called above, so it's already done.
-	logger.Info("Checking assistant response", "content_length", len(responseContent), "has_tool_calls", false)
-	if responseContent != "" {
-		sess.AddMessage("assistant", responseContent)
-	}
 	logger.Info("Added assistant response to session", "content", responseContent[:min(100, len(responseContent))])
 
 	// Save session
