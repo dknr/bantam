@@ -36,6 +36,28 @@ func (t *GrepTool) StatusLine(args map[string]any) string {
 	return fmt.Sprintf("grep> pattern=%s path=%s", pattern, path)
 }
 
+// ToolSchema returns the parameter schema for the grep tool.
+func (t *GrepTool) ToolSchema() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{
+			"pattern": map[string]any{
+				"type":        "string",
+				"description": "The pattern to search for (regex unless literal_text is true)",
+			},
+			"path": map[string]any{
+				"type":        "string",
+				"description": "The path to search, relative to workspace. Defaults to '.' (current directory).",
+			},
+			"literal_text": map[string]any{
+				"type":        "boolean",
+				"description": "If true, treat the pattern as a literal string rather than a regular expression. Defaults to false.",
+			},
+		},
+		"required": []string{"pattern"},
+	}
+}
+
 // Execute performs the grep operation.
 func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	pattern, ok := args["pattern"].(string)

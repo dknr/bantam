@@ -28,6 +28,21 @@ func (t *CatTool) StatusLine(args map[string]any) string {
 	return fmt.Sprintf("cat> %s", path)
 }
 
+// ToolSchema returns the parameter schema for the cat tool.
+func (t *CatTool) ToolSchema() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{
+			"path": map[string]any{
+				"type":        "string",
+				"description": "Path relative to workspace. Use relative paths only (e.g., file.md, subdir/file.txt). Never use absolute paths.",
+			},
+		},
+		"description": "Read file contents from the workspace directory. Only relative paths are allowed.",
+		"required":    []string{"path"},
+	}
+}
+
 // Execute performs file read based on the action.
 func (t *CatTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	relPath, ok := args["path"].(string)

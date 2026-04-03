@@ -16,6 +16,11 @@ type StatusLineTool interface {
 	StatusLine(args map[string]any) string
 }
 
+// SchemaTool is an optional interface for tools that can provide their own parameter schema.
+type SchemaTool interface {
+	ToolSchema() map[string]any
+}
+
 // Registry holds available tools.
 type Registry struct {
 	tools map[string]Tool
@@ -71,95 +76,17 @@ func (r *Registry) Definitions() []map[string]any {
 func (r *Registry) DefinitionsWithSchema() []map[string]any {
 	defs := make([]map[string]any, 0, len(r.tools))
 	for _, tool := range r.tools {
-		schema := map[string]any{
-			"type":       "object",
-			"properties": map[string]any{},
-		}
-
-		// Add specific parameter schemas for known tools
-		switch tool.Name() {
-		case "echo":
-			schema["properties"].(map[string]any)["message"] = map[string]any{
-				"type":        "string",
-				"description": "The message to echo back",
+		var schema map[string]any
+		// Check if the tool provides its own schema
+		if schemaTool, ok := tool.(SchemaTool); ok {
+			schema = schemaTool.ToolSchema()
+		} else {
+			// This should not happen if all tools properly implement SchemaTool
+			// Keeping minimal schema for safety during transition
+			schema = map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
 			}
-			schema["required"] = []string{"message"}
-	case "cat":
-		schema["properties"].(map[string]any)["path"] = map[string]any{
-			"type":        "string",
-			"description": "Path relative to workspace. Use relative paths only (e.g., file.md, subdir/file.txt). Never use absolute paths.",
-		}
-		schema["description"] = "Read file contents from the workspace directory. Only relative paths are allowed."
-		schema["required"] = []string{"path"}
-	case "sed":
-		schema["properties"].(map[string]any)["path"] = map[string]any{
-			"type":        "string",
-			"description": "Path relative to workspace. Use relative paths only (e.g., file.md, subdir/file.txt). Never use absolute paths.",
-		}
-		schema["properties"].(map[string]any)["content"] = map[string]any{
-			"type":        "string",
-			"description": "The content to write to the file.",
-		}
-		schema["description"] = "Write content to a file in the workspace directory. Only relative paths are allowed."
-		schema["required"] = []string{"path", "content"}
-	case "ls":
-		schema["properties"].(map[string]any)["path"] = map[string]any{
-			"type":        "string",
-			"description": "The path to list, relative to workspace. Defaults to \".\" (current directory).",
-		}
-		schema["description"] = "List directory contents in the workspace directory. Only relative paths are allowed."
-		// path optional, no required field
-		case "memory":
-			schema["properties"].(map[string]any)["action"] = map[string]any{
-				"type":        "string",
-				"description": "The action to perform: read, write, list, search, or since",
-			}
-			schema["properties"].(map[string]any)["key"] = map[string]any{
-				"type":        "string",
-				"description": "The memory key (required for read/write actions)",
-			}
-			schema["properties"].(map[string]any)["old_value"] = map[string]any{
-				"type":        "string",
-				"description": "The expected current value (for compare-exchange write, empty string if new)",
-			}
-			schema["properties"].(map[string]any)["new_value"] = map[string]any{
-				"type":        "string",
-				"description": "The new value to store",
-			}
-			schema["properties"].(map[string]any)["query"] = map[string]any{
-				"type":        "string",
-				"description": "The search query for history entries",
-			}
-			schema["properties"].(map[string]any)["timestamp"] = map[string]any{
-				"type":        "string",
-				"description": "Timestamp in ISO8601 format for history_since action",
-			}
-			schema["required"] = []string{"action"}
-		case "grep":
-			schema["properties"].(map[string]any)["pattern"] = map[string]any{
-				"type":        "string",
-				"description": "The pattern to search for (regex unless literal_text is true)",
-			}
-			schema["properties"].(map[string]any)["path"] = map[string]any{
-				"type":        "string",
-				"description": "The path to search, relative to workspace. Defaults to '.' (current directory).",
-			}
-			schema["properties"].(map[string]any)["literal_text"] = map[string]any{
-				"type":        "boolean",
-				"description": "If true, treat the pattern as a literal string rather than a regular expression. Defaults to false.",
-			}
-			schema["required"] = []string{"pattern"}
-		case "git":
-			schema["properties"].(map[string]any)["args"] = map[string]any{
-				"type":        "array",
-				"items":       map[string]any{"type": "string"},
-				"description": "Arguments to pass to the git command (e.g., ['status', '--short']). Only non-destructive subcommands are allowed.",
-			}
-			schema["properties"].(map[string]any)["path"] = map[string]any{
-				"type":        "string",
-				"description": "The working directory for the git command, relative to workspace. This parameter is required.",
-			}
-			schema["required"] = []string{"args", "path"}
 		}
 
 		defs = append(defs, map[string]any{

@@ -36,6 +36,25 @@ func (t *GitTool) StatusLine(args map[string]any) string {
 	return "git> (unknown args)"
 }
 
+// ToolSchema returns the parameter schema for the git tool.
+func (t *GitTool) ToolSchema() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{
+			"args": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Arguments to pass to the git command (e.g., ['status', '--short']). Only non-destructive subcommands are allowed.",
+			},
+			"path": map[string]any{
+				"type":        "string",
+				"description": "The working directory for the git command, relative to workspace. This parameter is required.",
+			},
+		},
+		"required": []string{"args", "path"},
+	}
+}
+
 // Name returns the tool name.
 func (t *GitTool) Name() string {
 	return "git"

@@ -32,6 +32,21 @@ func (t *LsTool) StatusLine(args map[string]any) string {
 	return fmt.Sprintf("ls> %s", path)
 }
 
+// ToolSchema returns the parameter schema for the ls tool.
+func (t *LsTool) ToolSchema() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{
+			"path": map[string]any{
+				"type":        "string",
+				"description": "The path to list, relative to workspace. Defaults to \".\" (current directory).",
+			},
+		},
+		"description": "List directory contents in the workspace directory. Only relative paths are allowed.",
+		// path optional, no required field
+	}
+}
+
 // Execute performs directory listing based on the action.
 func (t *LsTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	relPath, ok := args["path"].(string)

@@ -51,6 +51,20 @@ func (t *EchoTool) StatusLine(args map[string]any) string {
 	return fmt.Sprintf("echo> %s", msg)
 }
 
+// ToolSchema returns the parameter schema for the echo tool.
+func (t *EchoTool) ToolSchema() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{
+			"message": map[string]any{
+				"type":        "string",
+				"description": "The message to echo back",
+			},
+		},
+		"required": []string{"message"},
+	}
+}
+
 // Execute returns the message parameter unchanged.
 func (t *EchoTool) Execute(ctx context.Context, args map[string]any) (any, error) {
 	msg, ok := args["message"]

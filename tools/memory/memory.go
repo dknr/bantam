@@ -88,6 +88,40 @@ func (t *MemoryTool) StatusLine(args map[string]any) string {
 	}
 }
 
+// ToolSchema returns the parameter schema for the memory tool.
+func (t *MemoryTool) ToolSchema() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{
+			"action": map[string]any{
+				"type":        "string",
+				"description": "The action to perform: read, write, list, search, or since",
+			},
+			"key": map[string]any{
+				"type":        "string",
+				"description": "The memory key (required for read/write actions)",
+			},
+			"old_value": map[string]any{
+				"type":        "string",
+				"description": "The expected current value (for compare-exchange write, empty string if new)",
+			},
+			"new_value": map[string]any{
+				"type":        "string",
+				"description": "The new value to store",
+			},
+			"query": map[string]any{
+				"type":        "string",
+				"description": "The search query for history entries",
+			},
+			"timestamp": map[string]any{
+				"type":        "string",
+				"description": "Timestamp in ISO8601 format for history_since action",
+			},
+		},
+		"required": []string{"action"},
+	}
+}
+
 // truncateValue shortens long values for display, adding ellipsis.
 func truncateValue(s string, maxLen int) string {
 	if len(s) <= maxLen {
