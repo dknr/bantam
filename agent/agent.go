@@ -16,13 +16,13 @@ import (
 	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
 	"github.com/dknr/bantam/provider"
-	"github.com/dknr/bantam/util"
 	"github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
 	"github.com/dknr/bantam/tracing"
+	"github.com/dknr/bantam/util"
+	"github.com/go-logr/logr"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"github.com/go-logr/logr"
 )
 
 // OutputMessageType represents the type of output message.
@@ -97,10 +97,10 @@ type Agent struct {
 	provider     provider.Provider
 	toolRegistry *tools.Registry
 	sessionMgr   *session.Manager
-	InputChan    chan string      // Only message content
+	InputChan    chan string // Only message content
 	OutputChan   chan OutputMessage
-	channel      string           // Fixed per agent (e.g., "cli")
-	chatID       string           // Fixed per agent
+	channel      string // Fixed per agent (e.g., "cli")
+	chatID       string // Fixed per agent
 }
 
 // New creates a new Agent instance with channel-based communication.
@@ -210,7 +210,7 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 
 		// Handle tool calls
 		a.executeToolCallsAndUpdateSession(ctx, resp.ToolCalls(), sess, logger)
-		
+
 		// Set durationMs only on first iteration
 		if firstIteration {
 			durationMs = callDurationMs
@@ -288,7 +288,7 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 									"id":   id,
 									"type": "function",
 									"function": map[string]any{
-										"name":     name,
+										"name":      name,
 										"arguments": argsStr,
 									},
 								})
@@ -438,7 +438,7 @@ func (a *Agent) executeToolCallsAndUpdateSession(ctx context.Context, toolCalls 
 func (a *Agent) storeAssistantMessage(sess *session.Session, resp *provider.Response, logger logr.Logger) {
 	if resp.HasToolCalls() {
 		data := map[string]interface{}{
-			"content": resp.Content(),
+			"content":    resp.Content(),
 			"tool_calls": resp.ToolCalls(),
 		}
 		jsonData, err := json.Marshal(data)
@@ -454,8 +454,6 @@ func (a *Agent) storeAssistantMessage(sess *session.Session, resp *provider.Resp
 		logger.Info("Added assistant response to session")
 	}
 }
-
-
 
 // Close closes the agent and any resources it holds.
 func (a *Agent) Close() {

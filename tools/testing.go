@@ -54,7 +54,7 @@ func (t *EchoTool) StatusLine(args map[string]any) string {
 // ToolSchema returns the parameter schema for the echo tool.
 func (t *EchoTool) ToolSchema() map[string]any {
 	return map[string]any{
-		"type":       "object",
+		"type": "object",
 		"properties": map[string]any{
 			"message": map[string]any{
 				"type":        "string",

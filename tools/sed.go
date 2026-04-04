@@ -31,7 +31,7 @@ func (t *SedTool) StatusLine(args map[string]any) string {
 // ToolSchema returns the parameter schema for the sed tool.
 func (t *SedTool) ToolSchema() map[string]any {
 	return map[string]any{
-		"type":       "object",
+		"type": "object",
 		"properties": map[string]any{
 			"path": map[string]any{
 				"type":        "string",

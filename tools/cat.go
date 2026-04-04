@@ -31,7 +31,7 @@ func (t *CatTool) StatusLine(args map[string]any) string {
 // ToolSchema returns the parameter schema for the cat tool.
 func (t *CatTool) ToolSchema() map[string]any {
 	return map[string]any{
-		"type":       "object",
+		"type": "object",
 		"properties": map[string]any{
 			"path": map[string]any{
 				"type":        "string",

@@ -35,7 +35,7 @@ func (t *LsTool) StatusLine(args map[string]any) string {
 // ToolSchema returns the parameter schema for the ls tool.
 func (t *LsTool) ToolSchema() map[string]any {
 	return map[string]any{
-		"type":       "object",
+		"type": "object",
 		"properties": map[string]any{
 			"path": map[string]any{
 				"type":        "string",

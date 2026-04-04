@@ -91,7 +91,7 @@ func (t *MemoryTool) StatusLine(args map[string]any) string {
 // ToolSchema returns the parameter schema for the memory tool.
 func (t *MemoryTool) ToolSchema() map[string]any {
 	return map[string]any{
-		"type":       "object",
+		"type": "object",
 		"properties": map[string]any{
 			"action": map[string]any{
 				"type":        "string",

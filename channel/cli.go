@@ -386,21 +386,20 @@ func PrintTokenStats(tokens map[string]int, durationMs float64, timing interface
 
 // PrintMarkdown prints the markdown-formatted response.
 func PrintMarkdown(response string) {
-    fmt.Println(RenderMarkdownStatic(response))
+	fmt.Println(RenderMarkdownStatic(response))
 }
 
 // PrintStatsLine prints the grey timestamp + token stats line.
 func PrintStatsLine(tokens map[string]int, durationMs float64, timing interface{}) {
-    fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
-    printTokenStats(tokens, durationMs, timing)
-    fmt.Println("\033[0m")
+	fmt.Printf("\033[90m%s | ", time.Now().Format("15:04:05"))
+	printTokenStats(tokens, durationMs, timing)
+	fmt.Println("\033[0m")
 }
-
 
 // PrintResponse prints an LLM response with token stats.
 func PrintResponse(response string, tokens map[string]int, durationMs float64, timing interface{}) {
-    PrintMarkdown(response)
-    // PrintStatsLine(tokens, durationMs, timing) // stats printed in agent
+	PrintMarkdown(response)
+	// PrintStatsLine(tokens, durationMs, timing) // stats printed in agent
 }
 
 // printTokenStats prints token usage statistics.

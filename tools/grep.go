@@ -1,8 +1,8 @@
 package tools
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,7 +39,7 @@ func (t *GrepTool) StatusLine(args map[string]any) string {
 // ToolSchema returns the parameter schema for the grep tool.
 func (t *GrepTool) ToolSchema() map[string]any {
 	return map[string]any{
-		"type":       "object",
+		"type": "object",
 		"properties": map[string]any{
 			"pattern": map[string]any{
 				"type":        "string",
@@ -87,8 +87,8 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (any, error
 	}
 
 	type matchResult struct {
-		file   string
-		line   int
+		file    string
+		line    int
 		content string
 	}
 	var matches []matchResult
@@ -152,39 +152,39 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (any, error
 	}
 
 	var result string
-		if len(matches) == 0 {
-			result = "No matches found."
+	if len(matches) == 0 {
+		result = "No matches found."
+	} else {
+		// Sort matches by file path and line number
+		sort.Slice(matches, func(i, j int) bool {
+			if matches[i].file != matches[j].file {
+				return matches[i].file < matches[j].file
+			}
+			return matches[i].line < matches[j].line
+		})
+
+		// Format the results
+		var resultLines []string
+		for _, m := range matches {
+			resultLines = append(resultLines, fmt.Sprintf("%s:%d:%s", m.file, m.line, m.content))
+		}
+		result = strings.Join(resultLines, "\n")
+	}
+
+	// Apply 8kB limit
+	const maxOutputSize = 8192
+	if len([]byte(result)) > maxOutputSize {
+		resultBytes := []byte(result)
+		truncated := resultBytes[:maxOutputSize]
+		lastNewline := bytes.LastIndex(truncated, []byte{'\n'})
+		if lastNewline == -1 {
+			result = string(truncated) + "\n[Output truncated to 8kB]"
 		} else {
-			// Sort matches by file path and line number
-			sort.Slice(matches, func(i, j int) bool {
-				if matches[i].file != matches[j].file {
-					return matches[i].file < matches[j].file
-				}
-				return matches[i].line < matches[j].line
-			})
-
-			// Format the results
-			var resultLines []string
-			for _, m := range matches {
-				resultLines = append(resultLines, fmt.Sprintf("%s:%d:%s", m.file, m.line, m.content))
-			}
-			result = strings.Join(resultLines, "\n")
+			result = string(truncated[:lastNewline]) + "\n[Output truncated to 8kB]"
 		}
+	}
 
-		// Apply 8kB limit
-		const maxOutputSize = 8192
-		if len([]byte(result)) > maxOutputSize {
-			resultBytes := []byte(result)
-			truncated := resultBytes[:maxOutputSize]
-			lastNewline := bytes.LastIndex(truncated, []byte{'\n'})
-			if lastNewline == -1 {
-				result = string(truncated) + "\n[Output truncated to 8kB]"
-			} else {
-				result = string(truncated[:lastNewline]) + "\n[Output truncated to 8kB]"
-			}
-		}
-
-		return result, nil
+	return result, nil
 }
 
 // searchFile searches a single file for the pattern.

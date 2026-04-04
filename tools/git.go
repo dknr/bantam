@@ -39,7 +39,7 @@ func (t *GitTool) StatusLine(args map[string]any) string {
 // ToolSchema returns the parameter schema for the git tool.
 func (t *GitTool) ToolSchema() map[string]any {
 	return map[string]any{
-		"type":       "object",
+		"type": "object",
 		"properties": map[string]any{
 			"args": map[string]any{
 				"type":        "array",
@@ -90,30 +90,30 @@ func (t *GitTool) Execute(ctx context.Context, args map[string]any) (any, error)
 
 	// Whitelist of non-destructive git subcommands
 	whitelist := map[string]bool{
-		"status": true,
-		"log":    true,
-		"diff":   true,
-		"show":   true,
-		"branch": true,
-		"checkout": true,
-		"clone":  true,
-		"fetch":  true,
-		"pull":   true,
-		"remote": true,
-		"config": true,
-		"ls-files": true,
-		"ls-tree": true,
-		"rev-parse": true,
-		"describe": true,
-		"blame": true,
-		"grep":   true,
-		"stash":  true,
+		"status":      true,
+		"log":         true,
+		"diff":        true,
+		"show":        true,
+		"branch":      true,
+		"checkout":    true,
+		"clone":       true,
+		"fetch":       true,
+		"pull":        true,
+		"remote":      true,
+		"config":      true,
+		"ls-files":    true,
+		"ls-tree":     true,
+		"rev-parse":   true,
+		"describe":    true,
+		"blame":       true,
+		"grep":        true,
+		"stash":       true,
 		"show-branch": true,
-		"tag":    true,
-		"notes":  true,
-		"verify": true,
+		"tag":         true,
+		"notes":       true,
+		"verify":      true,
 		"whatchanged": true,
-		"help":   true,
+		"help":        true,
 	}
 
 	if subcommand != "" && !whitelist[subcommand] {

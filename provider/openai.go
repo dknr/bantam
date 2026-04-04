@@ -222,8 +222,6 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, to
 	return llmResponse, nil
 }
 
-
-
 // GetDefaultModel returns the default model.
 func (p *OpenAIProvider) GetDefaultModel() string {
 	return p.model

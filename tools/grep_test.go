@@ -51,8 +51,8 @@ and more
 
 	// Test literal search for "hello"
 	args := map[string]any{
-		"pattern":        "hello",
-		"literal_text":   true,
+		"pattern":      "hello",
+		"literal_text": true,
 	}
 	result, err := tool.Execute(context.Background(), args)
 	if err != nil {
@@ -69,8 +69,8 @@ subdir/sub.txt:2:with hello world
 
 	// Test regex search for "hello.*world"
 	args = map[string]any{
-		"pattern":        "hello.*world",
-		"literal_text":   false,
+		"pattern":      "hello.*world",
+		"literal_text": false,
 	}
 	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
@@ -85,9 +85,9 @@ subdir/sub.txt:2:with hello world
 
 	// Test path argument
 	args = map[string]any{
-		"pattern":        "subdirectory",
-		"literal_text":   true,
-		"path":           "subdir",
+		"pattern":      "subdirectory",
+		"literal_text": true,
+		"path":         "subdir",
 	}
 	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
@@ -101,8 +101,8 @@ subdir/sub.txt:2:with hello world
 
 	// Test no matches
 	args = map[string]any{
-		"pattern":        "nomatch",
-		"literal_text":   true,
+		"pattern":      "nomatch",
+		"literal_text": true,
 	}
 	result, err = tool.Execute(context.Background(), args)
 	if err != nil {
