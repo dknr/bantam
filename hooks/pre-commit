@@ -1,0 +1,20 @@
+#!/bin/sh
+# pre-commit hook to check Go formatting for staged files
+
+# List staged *.go files
+files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
+
+# If none, allow the commit
+[ -z "$files" ] && exit 0
+
+# Run gofmt -l on those files
+unformatted=$(gofmt -l $files 2>/dev/null || true)
+
+if [ -n "$unformatted" ]; then
+    echo "Formatting issues detected in staged files:"
+    echo "$unformatted"
+    echo "Please run 'go fmt' on the above files and re-add them."
+    exit 1
+fi
+
+exit 0
