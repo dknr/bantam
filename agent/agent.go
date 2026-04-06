@@ -1,8 +1,7 @@
 // Package agent provides the core agent loop with unified message routing.
 //
 // Key design principle: ALL messages flow through one code path,
-// regardless of source (CLI, gateway, etc.). This ensures OpenTelemetry
-// tracing works consistently.
+// regardless of source (CLI, gateway, etc.).
 package agent
 
 import (
@@ -18,11 +17,7 @@ import (
 	"github.com/dknr/bantam/provider"
 	"github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
-	"github.com/dknr/bantam/tracing"
-	"github.com/dknr/bantam/util"
 	"github.com/go-logr/logr"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 )
 
 // OutputMessageType represents the type of output message.
@@ -136,16 +131,6 @@ func (a *Agent) Start(ctx context.Context) {
 // processMessageWithTiming is the internal implementation that handles message processing.
 // It sends output messages to the output channel instead of returning values.
 func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
-	// Create span for this message (unified for all sources)
-	ctx, processSpan := tracing.StartActiveSpan(ctx, "process_message", map[string]string{
-		"channel":   a.channel,
-		"chat_id":   a.chatID,
-		"operation": "receive",
-	})
-	if processSpan != nil {
-		defer processSpan.End()
-	}
-
 	logger := logging.FromContext(ctx)
 	logger.Info("Processing message", "channel", a.channel, "chat_id", a.chatID)
 
@@ -311,7 +296,7 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 	return messages
 }
 
-// callLLMWithTiming calls the LLM provider with timing and tracing.
+// callLLMWithTiming calls the LLM provider with timing.
 func (a *Agent) callLLMWithTiming(ctx context.Context, messages []map[string]any, logger logr.Logger) (*provider.Response, error, int64, map[string]int, interface{}) {
 	// Call LLM with timing
 	logger.Info("calling LLM", "messages_count", len(messages))
@@ -325,22 +310,10 @@ func (a *Agent) callLLMWithTiming(ctx context.Context, messages []map[string]any
 		logging.PrintJSON("Request", reqData)
 	}
 	startTime := time.Now()
-	ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.chat", map[string]string{
-		"messages_count": fmt.Sprintf("%d", len(messages)),
-	})
 	resp, err := a.provider.Chat(ctx, messages, a.toolRegistry.DefinitionsWithSchema())
 	if err != nil {
-		if chatSpan != nil {
-			chatSpan.SetStatus(codes.Error, err.Error())
-			chatSpan.End()
-		}
 		logger.Error(err, "LLM chat failed")
 		return nil, err, 0, nil, nil
-	}
-	if chatSpan != nil {
-		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", util.BoolToInt(resp.HasToolCalls())))
-		chatSpan.SetAttributes(attribute.Int("response.content_length", len(resp.Content())))
-		chatSpan.End()
 	}
 	durationMs := time.Since(startTime).Milliseconds()
 	callTokens := resp.TokenDetails()
@@ -398,34 +371,19 @@ func (a *Agent) executeToolCallsAndUpdateSession(ctx context.Context, toolCalls 
 			}
 		}
 
-		// Execute tool with span
-		ctx, toolSpan := tracing.StartActiveSpan(ctx, "tool.execute", map[string]string{
-			"tool.name": call.Name,
-		})
+		// Execute tool
 		result, err := a.toolRegistry.Execute(ctx, call.Name, call.Arguments)
 		if err != nil {
 			logger.Error(err, "tool execution failed", "tool", call.Name)
-			if toolSpan != nil {
-				toolSpan.SetStatus(codes.Error, err.Error())
-			}
 			// Print error in red to terminal (send to output channel)
 			select {
 			case a.OutputChan <- OutputError{Err: fmt.Errorf("tool %s failed: %w", call.Name, err)}:
 			case <-ctx.Done():
-				if toolSpan != nil {
-					toolSpan.End()
-				}
 				return
 			}
 			// Add error as tool result so LLM can see what went wrong and potentially retry
 			sess.AddMessage("tool", fmt.Sprintf("{\"name\": \"%s\", \"content\": \"Error: %v\"}", call.Name, err))
-			if toolSpan != nil {
-				toolSpan.End()
-			}
 			continue
-		}
-		if toolSpan != nil {
-			toolSpan.End()
 		}
 
 		// Add tool result to session

@@ -12,7 +12,6 @@ import (
 	bantsession "github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
 	"github.com/dknr/bantam/tools/memory"
-	"github.com/dknr/bantam/tracing"
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -30,11 +29,7 @@ var (
 // Config represents the bantam configuration
 type Config struct {
 	Workspace string `yaml:"workspace"`
-	Tracing   struct {
-		Endpoint    string `yaml:"endpoint"`
-		ServiceName string `yaml:"serviceName"`
-	} `yaml:"tracing"`
-	Provider struct {
+	Provider  struct {
 		APIKey  string `yaml:"apiKey"`
 		APIBase string `yaml:"apiBase"`
 		Model   string `yaml:"model"`
@@ -84,13 +79,7 @@ Usage:
 					if os.Getenv("BANTAM_MODEL") == "" && config.Provider.Model != "" {
 						os.Setenv("BANTAM_MODEL", config.Provider.Model)
 					}
-					// Apply tracing settings from config
-					if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && config.Tracing.Endpoint != "" {
-						os.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", config.Tracing.Endpoint)
-					}
-					if os.Getenv("OTEL_SERVICE_NAME") == "" && config.Tracing.ServiceName != "" {
-						os.Setenv("OTEL_SERVICE_NAME", config.Tracing.ServiceName)
-					}
+
 				}
 			}
 		}
@@ -167,24 +156,4 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 // getCLIChannel creates and returns a CLI channel
 func getCLIChannel(sessions *bantsession.Manager) *channel.CLIChannel {
 	return channel.NewCLIChannel(sessions, sessionKey)
-}
-
-// setupTracing configures OpenTelemetry tracing.
-func setupTracing(logger logr.Logger) error {
-	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	otelServiceName := os.Getenv("OTEL_SERVICE_NAME")
-	if otelServiceName == "" {
-		otelServiceName = "bantam"
-	}
-
-	// Strip http:// or https:// prefix from endpoint for gRPC
-	if otelEndpoint != "" {
-		if len(otelEndpoint) > 7 && otelEndpoint[:7] == "http://" {
-			otelEndpoint = otelEndpoint[7:]
-		} else if len(otelEndpoint) > 8 && otelEndpoint[:8] == "https://" {
-			otelEndpoint = otelEndpoint[8:]
-		}
-	}
-
-	return tracing.SetupOTEL(otelEndpoint, otelServiceName)
 }

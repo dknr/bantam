@@ -39,9 +39,6 @@ var initCmd = &cobra.Command{
 		// Write config
 		configContent := `workspace: ` + workspace + `
 
-tracing:
-  endpoint: ""
-  serviceName: bantam
 provider:
   apiKey: ""
   apiBase: http://localhost:11434/v1

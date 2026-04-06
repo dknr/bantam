@@ -53,7 +53,6 @@ bantam/
 ├── provider/         # LLM provider interface
 ├── session/          # Session management (SQLite)
 ├── tools/            # Tool definitions (cat, sed, ls, time, echo, grep, git, memory)
-├── tracing/          # OpenTelemetry integration
 └── paths/            # Path configuration
 ```
 

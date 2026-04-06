@@ -9,7 +9,6 @@ import (
 	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
 	bantsession "github.com/dknr/bantam/session"
-	"github.com/dknr/bantam/tracing"
 	"github.com/spf13/cobra"
 )
 
@@ -22,12 +21,6 @@ var runCmd = &cobra.Command{
 		logger := logging.NewLogger(paths.LogsDir, verbose)
 		ctx := logging.NewContextWithLogger(context.Background(), logger)
 		ctx = logging.SetVerbose(ctx, verbose)
-
-		// Setup OpenTelemetry
-		if err := setupTracing(logger); err != nil {
-			return err
-		}
-		defer tracing.ShutdownOTEL()
 
 		// Create agent
 		ag, memoryTool, err := getAgent(logger)

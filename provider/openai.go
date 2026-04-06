@@ -9,10 +9,6 @@ import (
 	"net/http"
 
 	"github.com/dknr/bantam/logging"
-	"github.com/dknr/bantam/tracing"
-	"github.com/dknr/bantam/util"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 )
 
 // OpenAIProvider implements the Provider interface for OpenAI-compatible APIs.
@@ -35,15 +31,6 @@ func NewOpenAIProvider(apiKey, apiBase, model string) *OpenAIProvider {
 
 // Chat sends a chat completion request to the OpenAI-compatible API.
 func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, tools []map[string]any) (*Response, error) {
-	// Create span for this LLM call
-	ctx, chatSpan := tracing.StartActiveSpan(ctx, "llm.provider_call", map[string]string{
-		"model":          p.model,
-		"messages_count": fmt.Sprintf("%d", len(messages)),
-		"tools_count":    fmt.Sprintf("%d", len(tools)),
-	})
-	if chatSpan != nil {
-		chatSpan.SetAttributes(attribute.String("llm.model", p.model))
-	}
 
 	reqBody := map[string]any{
 		"model":    p.model,
@@ -74,10 +61,6 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, to
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		if chatSpan != nil {
-			chatSpan.SetStatus(codes.Error, err.Error())
-			chatSpan.End()
-		}
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
@@ -88,10 +71,6 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, to
 	}
 
 	if resp.StatusCode != 200 {
-		if chatSpan != nil {
-			chatSpan.SetStatus(codes.Error, "non-200 status code")
-			chatSpan.End()
-		}
 		return nil, fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -105,39 +84,23 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, to
 
 	var apiResult map[string]any
 	if err := json.Unmarshal(body, &apiResult); err != nil {
-		if chatSpan != nil {
-			chatSpan.SetStatus(codes.Error, "failed to parse response")
-			chatSpan.End()
-		}
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	// Extract choices[0].message
 	choices, ok := apiResult["choices"].([]any)
 	if !ok || len(choices) == 0 {
-		if chatSpan != nil {
-			chatSpan.SetStatus(codes.Error, "no choices in response")
-			chatSpan.End()
-		}
 		return nil, fmt.Errorf("no choices in response")
 	}
 
 	choice, ok := choices[0].(map[string]any)
 	if !ok {
-		if chatSpan != nil {
-			chatSpan.SetStatus(codes.Error, "invalid choice format")
-			chatSpan.End()
-		}
 		return nil, fmt.Errorf("invalid choice format")
 	}
 
 	// Message object is nested under "message" key
 	message, ok := choice["message"].(map[string]any)
 	if !ok {
-		if chatSpan != nil {
-			chatSpan.SetStatus(codes.Error, "invalid message format in choice")
-			chatSpan.End()
-		}
 		return nil, fmt.Errorf("invalid message format in choice")
 	}
 
@@ -211,14 +174,6 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, to
 	llmResponse := NewResponse(content, toolCalls, finishReason)
 	llmResponse.SetTokens(tokens)
 	llmResponse.SetTiming(timing)
-	if chatSpan != nil {
-		chatSpan.SetAttributes(attribute.Int("llm.token.prompt", tokens["prompt"]))
-		chatSpan.SetAttributes(attribute.Int("llm.token.completion", tokens["completion"]))
-		chatSpan.SetAttributes(attribute.Int("llm.token.total", tokens["total"]))
-		chatSpan.SetAttributes(attribute.Int("response.has_tool_calls", util.BoolToInt(len(toolCalls) > 0)))
-		chatSpan.SetAttributes(attribute.Int("response.content_length", len(content)))
-		chatSpan.End()
-	}
 	return llmResponse, nil
 }
 

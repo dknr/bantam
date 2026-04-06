@@ -1,6 +1,6 @@
 package util
 
-// BoolToInt converts bool to int for OpenTelemetry attributes.
+// BoolToInt converts bool to int.
 func BoolToInt(b bool) int {
 	if b {
 		return 1
