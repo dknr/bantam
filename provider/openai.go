@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/dknr/bantam/logging"
 )
 
 // OpenAIProvider implements the Provider interface for OpenAI-compatible APIs.
@@ -75,12 +73,6 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []map[string]any, to
 	}
 
 	// Log request and response in verbose mode
-	if logging.IsVerbose(ctx) {
-		logging.PrintJSON("Provider Request", reqBody)
-		var apiResult map[string]any
-		json.Unmarshal(body, &apiResult)
-		logging.PrintJSON("Provider Response", apiResult)
-	}
 
 	var apiResult map[string]any
 	if err := json.Unmarshal(body, &apiResult); err != nil {

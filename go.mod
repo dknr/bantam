@@ -4,10 +4,7 @@ go 1.25.8
 
 require (
 	charm.land/glamour/v2 v2.0.0
-	github.com/go-logr/logr v1.4.3
-	github.com/go-logr/zapr v1.3.0
 	github.com/spf13/cobra v1.10.2
-	go.uber.org/zap v1.27.1
 	golang.org/x/term v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.46.1

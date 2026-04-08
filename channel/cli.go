@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"charm.land/glamour/v2"
-	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/provider"
 	"github.com/dknr/bantam/session"
 	"golang.org/x/term"
@@ -40,7 +39,6 @@ func (c *CLIChannel) Name() string {
 // Start begins receiving messages from stdin.
 func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context, sessionKey, chatID, content string) error) error {
 	c.running = true
-	logger := logging.FromContext(ctx)
 
 	reader := bufio.NewReader(os.Stdin)
 	// Extract session key parts
@@ -55,7 +53,7 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 	for c.running {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			logger.Error(err, "failed to read input")
+			fmt.Fprintf(os.Stderr, "failed to read input: %v\n", err)
 			continue
 		}
 
@@ -92,7 +90,6 @@ func (c *CLIChannel) Start(ctx context.Context, handler func(ctx context.Context
 		default:
 			// Process message through handler
 			if err := handler(ctx, sessionKey, chatID, line); err != nil {
-				logger.Error(err, "failed to process message")
 				fmt.Printf("Error: %v\n", err)
 				continue
 			}

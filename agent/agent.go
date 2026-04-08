@@ -12,12 +12,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
 	"github.com/dknr/bantam/provider"
 	"github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
-	"github.com/go-logr/logr"
 )
 
 // OutputMessageType represents the type of output message.
@@ -75,15 +73,13 @@ type OutputFinalResponse struct {
 func (OutputFinalResponse) Type() OutputMessageType { return OutputFinalResponseType }
 
 // loadSystemPrompt loads the system prompt from soul.md or returns a fallback.
-func loadSystemPrompt(logger logr.Logger, workspaceDir string) string {
+func loadSystemPrompt(workspaceDir string) string {
 	soulPath := filepath.Join(workspaceDir, "soul.md")
 	if data, err := os.ReadFile(soulPath); err == nil {
-		logger.Info("Loaded system prompt from soul.md", "path", soulPath)
 		return string(data)
 	}
 	// Fallback if soul.md doesn't exist
 	fallback := "Read soul.md from your workspace for your identity and instructions."
-	logger.Info("soul.md not found, using fallback system prompt", "path", soulPath)
 	return fallback
 }
 
@@ -131,19 +127,6 @@ func (a *Agent) Start(ctx context.Context) {
 // processMessageWithTiming is the internal implementation that handles message processing.
 // It sends output messages to the output channel instead of returning values.
 func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
-	logger := logging.FromContext(ctx)
-	logger.Info("Processing message", "channel", a.channel, "chat_id", a.chatID)
-
-	// Log request in verbose mode
-	if logging.IsVerbose(ctx) {
-		reqData := map[string]any{
-			"channel":     a.channel,
-			"chat_id":     a.chatID,
-			"content":     content,
-			"session_key": fmt.Sprintf("%s:%s", a.channel, a.chatID),
-		}
-		logging.PrintJSON("Request", reqData)
-	}
 
 	// Build session key (统一 session key 格式)
 	sessionKey := fmt.Sprintf("%s:%s", a.channel, a.chatID)
@@ -152,14 +135,12 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 	sess := a.sessionMgr.GetOrCreate(sessionKey)
 	// If session is new, add system prompt as first message
 	if sess.MessageCount() == 0 {
-		systemPrompt := loadSystemPrompt(logger, paths.WorkspaceDir)
+		systemPrompt := loadSystemPrompt(paths.WorkspaceDir)
 		sess.AddMessage("system", systemPrompt)
 	}
 	// Add user message to session
 	sess.AddMessage("user", content)
 
-	var tokens map[string]int
-	var durationMs int64
 	var responseContent string
 	firstIteration := true
 
@@ -168,7 +149,7 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 		messages := a.buildMessages(sess)
 
 		// Call LLM with timing
-		resp, err, callDurationMs, callTokens, callTiming := a.callLLMWithTiming(ctx, messages, logger)
+		resp, err, callDurationMs, callTokens, callTiming := a.callLLMWithTiming(ctx, messages)
 		if err != nil {
 			// Send error to output channel
 			select {
@@ -180,46 +161,28 @@ func (a *Agent) processMessageWithTiming(ctx context.Context, content string) {
 		}
 
 		// Handle LLM response output (stats and intermediate response)
-		a.handleLLMResponseOutput(ctx, resp, callDurationMs, callTokens, callTiming, logger)
+		a.handleLLMResponseOutput(ctx, resp, callDurationMs, callTokens, callTiming)
 
 		// Store assistant message in session
-		a.storeAssistantMessage(sess, resp, logger)
+		a.storeAssistantMessage(sess, resp)
 
 		if !resp.HasToolCalls() {
 			// Final response
 			responseContent = resp.Content()
-			tokens = callTokens
-			// durationMs is already set from first iteration (or remains 0 if no iterations, but there's always at least one)
 			break
 		}
 
 		// Handle tool calls
-		a.executeToolCallsAndUpdateSession(ctx, resp.ToolCalls(), sess, logger)
+		a.executeToolCallsAndUpdateSession(ctx, resp.ToolCalls(), sess)
 
 		// Set durationMs only on first iteration
 		if firstIteration {
-			durationMs = callDurationMs
 			firstIteration = false
 		}
 	}
 
-	logger.Info("Added assistant response to session", "content", responseContent[:min(100, len(responseContent))])
-
 	// Save session
 	a.sessionMgr.Save(sess)
-
-	logger.Info("response content", "content_length", len(responseContent), "tokens", tokens)
-
-	// Log response in verbose mode
-	if logging.IsVerbose(ctx) {
-		respData := map[string]any{
-			"content":        responseContent,
-			"has_tool_calls": false,
-			"tokens":         tokens,
-			"duration_ms":    durationMs,
-		}
-		logging.PrintJSON("Response", respData)
-	}
 
 	// Send final response to output channel
 	select {
@@ -297,33 +260,20 @@ func (a *Agent) buildMessages(sess *session.Session) []map[string]any {
 }
 
 // callLLMWithTiming calls the LLM provider with timing.
-func (a *Agent) callLLMWithTiming(ctx context.Context, messages []map[string]any, logger logr.Logger) (*provider.Response, error, int64, map[string]int, interface{}) {
-	// Call LLM with timing
-	logger.Info("calling LLM", "messages_count", len(messages))
-	if logging.IsVerbose(ctx) {
-		reqData := map[string]any{
-			"channel":     a.channel,
-			"chat_id":     a.chatID,
-			"session_key": fmt.Sprintf("%s:%s", a.channel, a.chatID),
-			"messages":    messages,
-		}
-		logging.PrintJSON("Request", reqData)
-	}
+func (a *Agent) callLLMWithTiming(ctx context.Context, messages []map[string]any) (*provider.Response, error, int64, map[string]int, interface{}) {
 	startTime := time.Now()
 	resp, err := a.provider.Chat(ctx, messages, a.toolRegistry.DefinitionsWithSchema())
 	if err != nil {
-		logger.Error(err, "LLM chat failed")
 		return nil, err, 0, nil, nil
 	}
 	durationMs := time.Since(startTime).Milliseconds()
 	callTokens := resp.TokenDetails()
 	callTiming := resp.Timing()
-	logger.Info("LLM response received", "has_tool_calls", resp.HasToolCalls(), "content_length", len(resp.Content()), "duration_ms", durationMs)
 	return resp, nil, durationMs, callTokens, callTiming
 }
 
 // handleLLMResponseOutput sends stats and intermediate response based on LLM response.
-func (a *Agent) handleLLMResponseOutput(ctx context.Context, resp *provider.Response, durationMs int64, callTokens map[string]int, callTiming interface{}, logger logr.Logger) {
+func (a *Agent) handleLLMResponseOutput(ctx context.Context, resp *provider.Response, durationMs int64, callTokens map[string]int, callTiming interface{}) {
 	// Send stats line for every LLM response (send to output channel)
 	select {
 	case a.OutputChan <- OutputStats{
@@ -349,7 +299,7 @@ func (a *Agent) handleLLMResponseOutput(ctx context.Context, resp *provider.Resp
 }
 
 // executeToolCallsAndUpdateSession executes tool calls and updates the session with results.
-func (a *Agent) executeToolCallsAndUpdateSession(ctx context.Context, toolCalls []provider.ToolCall, sess *session.Session, logger logr.Logger) {
+func (a *Agent) executeToolCallsAndUpdateSession(ctx context.Context, toolCalls []provider.ToolCall, sess *session.Session) {
 	for _, call := range toolCalls {
 		if _, exists := a.toolRegistry.Get(call.Name); exists {
 			select {
@@ -374,7 +324,6 @@ func (a *Agent) executeToolCallsAndUpdateSession(ctx context.Context, toolCalls 
 		// Execute tool
 		result, err := a.toolRegistry.Execute(ctx, call.Name, call.Arguments)
 		if err != nil {
-			logger.Error(err, "tool execution failed", "tool", call.Name)
 			// Print error in red to terminal (send to output channel)
 			select {
 			case a.OutputChan <- OutputError{Err: fmt.Errorf("tool %s failed: %w", call.Name, err)}:
@@ -393,7 +342,7 @@ func (a *Agent) executeToolCallsAndUpdateSession(ctx context.Context, toolCalls 
 }
 
 // storeAssistantMessage stores the assistant message in the session.
-func (a *Agent) storeAssistantMessage(sess *session.Session, resp *provider.Response, logger logr.Logger) {
+func (a *Agent) storeAssistantMessage(sess *session.Session, resp *provider.Response) {
 	if resp.HasToolCalls() {
 		data := map[string]interface{}{
 			"content":    resp.Content(),
@@ -406,10 +355,8 @@ func (a *Agent) storeAssistantMessage(sess *session.Session, resp *provider.Resp
 		} else {
 			sess.AddMessage("assistant", string(jsonData))
 		}
-		logger.Info("Stored assistant message with tool calls as JSON")
 	} else {
 		sess.AddMessage("assistant", resp.Content())
-		logger.Info("Added assistant response to session")
 	}
 }
 

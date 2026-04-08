@@ -7,7 +7,6 @@ import (
 
 	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
-	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
 	bantsession "github.com/dknr/bantam/session"
 	"github.com/spf13/cobra"
@@ -19,13 +18,8 @@ var promptCmd = &cobra.Command{
 	Long:  `Send a message to the agent and print the response, then exit.`,
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Setup logger
-		logger := logging.NewLogger(paths.LogsDir, verbose)
-		ctx := logging.NewContextWithLogger(context.Background(), logger)
-		ctx = logging.SetVerbose(ctx, verbose)
-
 		// Create agent
-		ag, memoryTool, err := getAgent(logger)
+		ag, memoryTool, err := getAgent()
 		if err != nil {
 			return err
 		}
@@ -34,6 +28,8 @@ var promptCmd = &cobra.Command{
 				memoryTool.Close()
 			}
 		}()
+
+		ctx := context.Background()
 
 		// Create session manager
 		sessions := bantsession.NewManager(paths.SessionsDir)
@@ -85,7 +81,7 @@ var promptCmd = &cobra.Command{
 				case agent.OutputError:
 					// Print error
 					errMsg := msg.(agent.OutputError)
-					logger.Error(errMsg.Err, "failed to process prompt")
+
 					fmt.Printf("\033[31mError: %v\033[0m\n\n", errMsg.Err)
 					return errMsg.Err
 				case agent.OutputFinalResponse:

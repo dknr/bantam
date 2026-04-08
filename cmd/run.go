@@ -6,7 +6,6 @@ import (
 
 	"github.com/dknr/bantam/agent"
 	"github.com/dknr/bantam/channel"
-	"github.com/dknr/bantam/logging"
 	"github.com/dknr/bantam/paths"
 	bantsession "github.com/dknr/bantam/session"
 	"github.com/spf13/cobra"
@@ -17,13 +16,8 @@ var runCmd = &cobra.Command{
 	Short: "Start interactive mode",
 	Long:  `Start an interactive chat session with the agent.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Setup logger
-		logger := logging.NewLogger(paths.LogsDir, verbose)
-		ctx := logging.NewContextWithLogger(context.Background(), logger)
-		ctx = logging.SetVerbose(ctx, verbose)
-
 		// Create agent
-		ag, memoryTool, err := getAgent(logger)
+		ag, memoryTool, err := getAgent()
 		if err != nil {
 			return err
 		}
@@ -32,6 +26,8 @@ var runCmd = &cobra.Command{
 				memoryTool.Close()
 			}
 		}()
+
+		ctx := context.Background()
 
 		// Create session manager
 		sessions := bantsession.NewManager(paths.SessionsDir)
@@ -79,7 +75,7 @@ var runCmd = &cobra.Command{
 							fmt.Printf("\033[36m> %s\033[0m\n", intermediate.Content)
 						case agent.OutputError:
 							errMsg := msg.(agent.OutputError)
-							logger.Error(errMsg.Err, "failed to process message")
+
 							fmt.Printf("\033[31mError: %v\033[0m\n\n", errMsg.Err)
 							// Don't return error here - just continue listening for more messages
 							// return errMsg.Err
@@ -94,7 +90,7 @@ var runCmd = &cobra.Command{
 			})
 
 			if err != nil {
-				logger.Error(err, "channel error")
+
 			}
 		}()
 
@@ -103,7 +99,7 @@ var runCmd = &cobra.Command{
 
 		// Cleanup
 		if err := cli.Stop(); err != nil {
-			logger.Error(err, "failed to stop channel")
+
 		}
 
 		return nil

@@ -12,14 +12,12 @@ import (
 	bantsession "github.com/dknr/bantam/session"
 	"github.com/dknr/bantam/tools"
 	"github.com/dknr/bantam/tools/memory"
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"strings"
 )
 
 var (
-	verbose    bool
 	sessionKey string
 	baseDir    string
 	workspace  string
@@ -94,7 +92,6 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Enable verbose console logging")
 	rootCmd.PersistentFlags().StringVar(&sessionKey, "session", "cli:direct", "Session key to use (format: channel:chatID)")
 	rootCmd.PersistentFlags().StringVar(&baseDir, "basedir", "", "Base directory for config/logs/sessions")
 	rootCmd.PersistentFlags().StringVar(&workspace, "workspace", "", "Workspace directory")
@@ -105,7 +102,7 @@ func init() {
 
 // getAgent creates and returns a configured agent
 // Returns the memoryTool for cleanup if needed.
-func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
+func getAgent() (*agent.Agent, *memory.MemoryTool, error) {
 	// Create provider
 	apiKey := os.Getenv("BANTAM_API_KEY")
 	apiBase := os.Getenv("BANTAM_API_BASE")
@@ -116,7 +113,6 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 
 	// Check if provider is configured
 	if apiBase == "" {
-		logger.Info("BANTAM_API_BASE not set, assuming local Ollama at http://localhost:11434/v1")
 		apiBase = "http://localhost:11434/v1"
 	}
 
@@ -136,7 +132,6 @@ func getAgent(logger logr.Logger) (*agent.Agent, *memory.MemoryTool, error) {
 	tr.Register(tools.NewGitTool(paths.WorkspaceDir))
 	memoryTool, err := memory.NewMemoryTool(paths.BaseDir)
 	if err != nil {
-		logger.Error(err, "failed to initialize memory tool")
 	} else {
 		tr.Register(memoryTool)
 	}
