@@ -130,6 +130,7 @@ func getAgent() (*agent.Agent, *memory.MemoryTool, error) {
 	tr.Register(tools.NewEchoTool())
 	tr.Register(tools.NewGrepTool(paths.WorkspaceDir))
 	tr.Register(tools.NewGitTool(paths.WorkspaceDir))
+	tr.Register(tools.NewShTool(paths.WorkspaceDir))
 	memoryTool, err := memory.NewMemoryTool(paths.BaseDir)
 	if err != nil {
 	} else {
